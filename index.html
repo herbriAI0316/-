@@ -249,9 +249,30 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--paper);color:var(--i
 
 <!-- HISTORY -->
 <div class="page" id="page-history">
-  <div class="section" style="padding-top:16px">
-    <div class="sec-hd"><div class="page-title" style="margin:0">配息記錄</div><span class="sec-btn" onclick="exportCSV()">匯出 CSV</span></div>
-    <div id="history-list"><div class="empty-state"><div class="empty-icon">📋</div><div>尚無配息記錄</div></div></div>
+  <div style="padding:16px 20px 0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="page-title" style="margin:0">配息紀錄</div>
+      <span class="sec-btn" onclick="exportHistCSV()">匯出 CSV</span>
+    </div>
+    <!-- 股票切換標籤 -->
+    <div id="hist-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <!-- 年度篩選 -->
+    <div style="display:flex;gap:5px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--ink3);flex-shrink:0">年度：</span>
+      <div id="hist-years" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    </div>
+    <!-- 配息總覽卡 -->
+    <div id="hist-summary" style="display:none;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;box-shadow:var(--shadow)">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px">年度累計配息</div><div style="font-size:14px;font-weight:600;color:var(--teal)" id="hs-annual">—</div></div>
+        <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px">稅後實拿</div><div style="font-size:14px;font-weight:600;color:var(--green)" id="hs-net">—</div></div>
+        <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px">配息次數</div><div style="font-size:14px;font-weight:600" id="hs-count">—</div></div>
+      </div>
+    </div>
+    <!-- 明細列表 -->
+    <div id="hist-detail-list">
+      <div class="empty-state"><div class="empty-icon">📋</div><div>請先新增持股</div><div style="margin-top:5px;opacity:0.55">點選股票代號查看配息紀錄</div></div>
+    </div>
   </div>
 </div>
 </div>
@@ -260,7 +281,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--paper);color:var(--i
   <button class="bnav-btn active" onclick="showPage('home',this)"><span class="bnav-icon">⬜</span><span>總覽</span></button>
   <button class="bnav-btn" onclick="showPage('search',this)"><span class="bnav-icon">◎</span><span>查詢</span></button>
   <button class="bnav-btn" onclick="showPage('tax',this)"><span class="bnav-icon">▣</span><span>稅務</span></button>
-  <button class="bnav-btn" onclick="showPage('history',this)"><span class="bnav-icon">≡</span><span>記錄</span></button>
+  <button class="bnav-btn" onclick="showPage('history',this)"><span class="bnav-icon">≡</span><span>紀錄</span></button>
 </div>
 
 <!-- MODALS -->
@@ -627,20 +648,142 @@ function renderTax(){
     :'<div style="font-size:12px;color:var(--ink3);padding:10px 0;text-align:center">尚無持股</div>';
 }
 
+// ── 配息紀錄頁 ──
+let histActiveCode = '';
+let histActiveYear = 'all';
+
 function renderHistory(){
-  const el=document.getElementById('history-list');
-  if(!S.history.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div>尚無配息記錄</div></div>';return;}
-  const tax=S.user.tax||28;
-  el.innerHTML=S.history.slice().reverse().map(r=>{const n=r.total>THR?r.total*NHI:0;const it=r.total*tax/100;return`<div class="hist-item"><div class="hist-top"><span class="hist-code">${r.code} <span style="font-size:11px;font-weight:400;color:var(--ink3)">${r.name||''}</span></span><span class="hist-net">${fmt(r.total-n-it)}</span></div><div class="hist-bot"><span>${r.date} ｜ ${r.lots}張 × NT$${(+r.dividend).toFixed(4)}</span><span style="color:var(--red)">扣 ${fmt(n+it)}</span></div></div>`;}).join('');
+  if(!S.holdings.length){
+    document.getElementById('hist-tabs').innerHTML='';
+    document.getElementById('hist-years').innerHTML='';
+    document.getElementById('hist-summary').style.display='none';
+    document.getElementById('hist-detail-list').innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div>請先新增持股</div></div>';
+    return;
+  }
+
+  // 建立股票切換標籤
+  const tabsEl = document.getElementById('hist-tabs');
+  const codes  = S.holdings.map(h=>h.code);
+  if(!histActiveCode || !codes.includes(histActiveCode)) histActiveCode = codes[0];
+
+  tabsEl.innerHTML = codes.map(code=>{
+    const h = S.holdings.find(x=>x.code===code);
+    const active = code===histActiveCode;
+    return `<span onclick="switchHistTab('${code}')" style="font-size:12px;padding:5px 12px;border-radius:20px;cursor:pointer;font-family:'DM Mono',monospace;border:1px solid ${active?'var(--teal)':' var(--border2)'};background:${active?'var(--teal-lt)':' var(--white)'};color:${active?'var(--teal)':' var(--ink3)'};transition:all 0.15s">${code}</span>`;
+  }).join('');
+
+  renderHistDetail();
 }
 
-function exportCSV(){
-  if(!S.history.length){alert('尚無記錄可匯出');return;}
-  const tax=S.user.tax||28;
-  const hd='日期,代號,名稱,張數,每股配息,總配息,二代健保,所得稅,稅後實拿';
-  const rows=S.history.map(r=>{const n=r.total>THR?(r.total*NHI).toFixed(0):0;const it=(r.total*tax/100).toFixed(0);return[r.date,r.code,r.name||'',r.lots,r.dividend,r.total.toFixed(0),n,it,(r.total-n-it).toFixed(0)].join(',');});
-  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent([hd,...rows].join('\n'));a.download='台股配息記錄.csv';a.click();
+function switchHistTab(code){
+  histActiveCode = code;
+  histActiveYear = 'all';
+  renderHistory();
 }
+
+function renderHistDetail(){
+  const h = S.holdings.find(x=>x.code===histActiveCode);
+  if(!h) return;
+
+  const tax     = S.user.tax||28;
+  const records = h.dividendHistory || [];
+
+  // 建立年度篩選
+  const years = [...new Set(records.map(r=>r.exDate?.slice(0,4)).filter(Boolean))].sort((a,b)=>b-a);
+  const yearsEl = document.getElementById('hist-years');
+  yearsEl.innerHTML = ['all',...years].map(y=>{
+    const active = y===histActiveYear;
+    const label  = y==='all'?'全部':y+'年';
+    return `<span onclick="switchHistYear('${y}')" style="font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;border:1px solid ${active?'var(--teal)':' var(--border2)'};background:${active?'var(--teal-lt)':' var(--white)'};color:${active?'var(--teal)':' var(--ink3)'}">${label}</span>`;
+  }).join('');
+
+  // 過濾年度
+  const filtered = histActiveYear==='all'
+    ? records
+    : records.filter(r=>r.exDate?.startsWith(histActiveYear));
+
+  // 計算總覽
+  const annDiv = +filtered.reduce((s,r)=>s+(r.dividend||0),0).toFixed(4);
+  const totalDiv = h.lots * 1000 * annDiv;
+  const nhi = totalDiv > THR ? totalDiv*NHI : 0;
+  const it  = totalDiv * tax/100;
+  const net = totalDiv - nhi - it;
+
+  const sumEl = document.getElementById('hist-summary');
+  if(filtered.length){
+    sumEl.style.display='block';
+    document.getElementById('hs-annual').textContent = 'NT$ ' + annDiv.toFixed(4) + ' /股';
+    document.getElementById('hs-net').textContent    = fmt(net);
+    document.getElementById('hs-count').textContent  = filtered.length + ' 次';
+  } else {
+    sumEl.style.display='none';
+  }
+
+  // 明細列表
+  const detailEl = document.getElementById('hist-detail-list');
+  if(!filtered.length){
+    detailEl.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div>此年度無配息記錄</div></div>';
+    return;
+  }
+
+  detailEl.innerHTML = filtered.map(r=>{
+    const rowDiv  = h.lots * 1000 * (r.dividend||0);
+    const rowNhi  = rowDiv > THR ? rowDiv*NHI : 0;
+    const rowIt   = rowDiv * tax/100;
+    const rowNet  = rowDiv - rowNhi - rowIt;
+    const chgPrev = ''; // 可擴充比較上次
+    return `<div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 2px rgba(26,28,34,0.04)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--ink)">${r.exDate||'—'} 除息</div>
+          ${r.payDate?`<div style="font-size:11px;color:var(--ink3)">配息日 ${r.payDate}</div>`:''} 
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:600;color:var(--teal)">NT$ ${(r.dividend||0).toFixed(4)}/股</div>
+          <div style="font-size:11px;color:var(--ink3)">${h.lots} 張 × 1000 股</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="text-align:center">
+          <div style="font-size:10px;color:var(--ink3)">稅前配息</div>
+          <div style="font-size:13px;font-weight:500">NT$ ${Math.round(rowDiv).toLocaleString()}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:10px;color:var(--ink3)">稅費扣除</div>
+          <div style="font-size:13px;font-weight:500;color:var(--red)">-NT$ ${Math.round(rowNhi+rowIt).toLocaleString()}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:10px;color:var(--ink3)">稅後實拿</div>
+          <div style="font-size:13px;font-weight:600;color:var(--green)">NT$ ${Math.round(rowNet).toLocaleString()}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function switchHistYear(y){
+  histActiveYear = y;
+  renderHistDetail();
+}
+
+function exportHistCSV(){
+  const h = S.holdings.find(x=>x.code===histActiveCode);
+  if(!h || !h.dividendHistory?.length){ alert('無資料可匯出'); return; }
+  const tax = S.user.tax||28;
+  const hd  = '除息日,代號,名稱,張數,每股配息,稅前配息,二代健保,所得稅,稅後實拿';
+  const rows = (h.dividendHistory||[]).map(r=>{
+    const total = h.lots*1000*(r.dividend||0);
+    const nhi   = total>THR?(total*NHI).toFixed(0):0;
+    const it    = (total*tax/100).toFixed(0);
+    return[r.exDate||'—',h.code,h.name||h.code,h.lots,(r.dividend||0).toFixed(4),total.toFixed(0),nhi,it,(total-nhi-it).toFixed(0)].join(',');
+  });
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent([hd,...rows].join('\n'));
+  a.download=h.code+'_配息紀錄.csv';
+  a.click();
+}
+
+function exportCSV(){ exportHistCSV(); }
 
 function renderAll(){renderHoldings();renderSummary();renderUpcoming();renderAlerts();}
 load();
