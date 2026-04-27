@@ -343,10 +343,11 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--paper);color:var(--i
 <script>
 // ▼▼▼ 部署後把這裡換成你的 Cloudflare Worker 網址 ▼▼▼
 const WORKER = 'https://twstock2.jmcpv5b47b.workers.dev';
-// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+// Worker 只負責股價（Yahoo Finance）
+// 除權息由瀏覽器直接抓 TWSE（台灣 IP，不被擋）
 
 const STORE='twstock_v5', NHI=0.0211, THR=20000;
-let S={user:{name:'',tax:28,alertDays:7},holdings:[],history:[]};
+let S={user:{name:'',alertDays:7},holdings:[],history:[]};
 let busy=false;
 
 function load(){
@@ -356,11 +357,160 @@ function load(){
 function save(){try{localStorage.setItem(STORE,JSON.stringify(S))}catch(e){}}
 const fmt=n=>n?'NT$ '+Math.round(n).toLocaleString():'—';
 
-async function api(path,code=''){
+// ── 股價：透過 Worker 查 Yahoo Finance ──
+async function fetchPrice(code){
   try{
-    const r=await fetch(`${WORKER}${path}${code?'?code='+encodeURIComponent(code):''}`);
+    const r=await fetch(`${WORKER}/api/price?code=${encodeURIComponent(code)}`);
     const j=await r.json();return j.ok?j.data:null;
   }catch(e){return null}
+}
+
+// ── 除權息：瀏覽器直接查 TWSE（台灣IP不被擋）──
+async function fetchDividends(code){
+  const year=new Date().getFullYear();
+  const now=new Date();
+  const all=[];
+
+  // 逐月掃描今年+去年+前年
+  const months=[];
+  for(const y of [year, year-1, year-2]){
+    for(let m=1;m<=12;m++){
+      if(new Date(y,m-1,1)>now) continue;
+      const lastDay=new Date(y,m,0).getDate();
+      const s=`${y}${String(m).padStart(2,'0')}01`;
+      const e=`${y}${String(m).padStart(2,'0')}${lastDay}`;
+      months.push({s,e});
+    }
+  }
+
+  // 每次查 2 個月（避免瀏覽器過多並發）
+  for(let i=0;i<months.length;i+=2){
+    const batch=months.slice(i,i+2);
+    await Promise.all(batch.map(async({s,e})=>{
+      try{
+        const url=`https://www.twse.com.tw/rwd/zh/exRight/TWT49U?response=json&strDate=${s}&endDate=${e}`;
+        const r=await fetch(url);
+        const json=await r.json();
+        if(json?.stat!=='OK') return;
+        (json?.data||[]).forEach(row=>{
+          if(!Array.isArray(row)||row.length<7) return;
+          if(String(row[1]||'').trim()!==code) return;
+          const exDate=toAD(String(row[0]||''));
+          const dividend=parseFloat(String(row[6]||0).replace(/,/g,''))||0;
+          if(!exDate) return;
+          if(!all.find(x=>x.exDate===exDate))
+            all.push({exDate,payDate:'',dividend,year:+exDate.slice(0,4)});
+        });
+      }catch(e){}
+    }));
+  }
+
+  // TWSE 沒資料時試 TPEx（上櫃，適合 00984D 等）
+  if(!all.length){
+    for(const y of [year,year-1,year-2]){
+      for(let m=1;m<=12;m++){
+        if(new Date(y,m-1,1)>now) continue;
+        try{
+          const rocY=y-1911;
+          const rocM=String(m).padStart(2,'0');
+          const lastDay=new Date(y,m,0).getDate();
+          const url=`https://www.tpex.org.tw/web/stock/exright/dailyquo/exright_result.php?l=zh-tw&d=${rocY}/${rocM}/01&ed=${rocY}/${rocM}/${lastDay}&stkno=${code}&s=0,asc&o=json`;
+          const r=await fetch(url);
+          const json=await r.json();
+          (json?.aaData||[]).forEach(row=>{
+            if(!Array.isArray(row)||row.length<5) return;
+            const rowCode=String(row[1]||'').trim();
+            if(rowCode&&rowCode!==code) return;
+            const exDate=toAD(String(row[0]||''));
+            const dividend=parseFloat(String(row[4]||0).replace(/,/g,''))||0;
+            if(!exDate) return;
+            if(!all.find(x=>x.exDate===exDate))
+              all.push({exDate,payDate:'',dividend,year:+exDate.slice(0,4)});
+          });
+        }catch(e){}
+      }
+    }
+  }
+
+  return all.sort((a,b)=>b.exDate.localeCompare(a.exDate));
+}
+
+// 日期轉換：民國 → 西元
+function toAD(raw){
+  if(!raw) return '';
+  const s=String(raw).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m1=s.match(/^(\d{2,3})年(\d{1,2})月(\d{1,2})日$/);
+  if(m1) return `${+m1[1]+1911}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
+  const m2=s.match(/^(\d{2,3})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if(m2) return `${+m2[1]+1911}-${m2[2].padStart(2,'0')}-${m2[3].padStart(2,'0')}`;
+  return '';
+}
+
+// 計算配息頻率與年度統計
+function calcDivStats(all){
+  const cur=new Date().getFullYear();
+  const byY={};
+  all.forEach(r=>{if(!byY[r.year])byY[r.year]=[];byY[r.year].push(r);});
+  const years=Object.keys(byY).map(Number).sort((a,b)=>b-a);
+  const refYear=years.find(y=>y<cur)||years[0]||cur-1;
+  const ref=byY[refYear]||[];
+  const thisYr=byY[cur]||[];
+  const freq=ref.length>=10?'月配':ref.length>=3?'季配':ref.length>=1?'年配':'不定期';
+  const src=thisYr.length?thisYr:ref;
+  const annDiv=+src.reduce((s,r)=>s+(r.dividend||0),0).toFixed(4);
+  return{freq,annDiv,thisYearCount:thisYr.length};
+}
+
+// 預估下次除息
+function estimateNext(last,freq){
+  if(!last) return '';
+  const days={月配:30,季配:91,年配:365,不定期:365};
+  const d=new Date(last);
+  if(isNaN(d.getTime())) return '';
+  d.setDate(d.getDate()+(days[freq]||365));
+  if(d<new Date()) d.setDate(d.getDate()+(days[freq]||365));
+  return d.toISOString().slice(0,10);
+}
+
+// 整合查詢：股價（Worker）+ 除權息（瀏覽器直接抓）
+async function fetchStock(code){
+  showToast('查詢 '+code+'...',false);
+
+  // 同時查股價和配息
+  const [priceData, divRecords] = await Promise.all([
+    fetchPrice(code),
+    fetchDividends(code),
+  ]);
+
+  const {freq,annDiv,thisYearCount}=calcDivStats(divRecords);
+  const latest=divRecords[0]||{};
+  const price=priceData?.price||0;
+  const div=latest.dividend||0;
+  const mult=freq==='月配'?12:freq==='季配'?4:1;
+  const currentYield=(price&&div)?+(div/price*100*mult).toFixed(2):0;
+  const annualYield=(price&&annDiv)?+(annDiv/price*100).toFixed(2):0;
+
+  return {
+    code,
+    name: priceData?.name||code,
+    type: /[A-Z]/.test(code)?'ETF(上櫃)':/^(0[0-9]{3,5}|006[0-9]{3})$/.test(code)?'ETF':'股票',
+    freq, price,
+    change: priceData?.change||0,
+    high: priceData?.high||0,
+    low: priceData?.low||0,
+    volume: priceData?.volume||0,
+    dividend: div,
+    annualDividend: annDiv,
+    annualYield, currentYield,
+    exDate: latest.exDate||'',
+    payDate: latest.payDate||'',
+    nextExDate: estimateNext(latest.exDate,freq),
+    dividendHistory: divRecords.slice(0,24),
+    thisYearCount,
+    updatedAt: new Date().toISOString(),
+    source: divRecords.length?`TWSE/TPEx（${divRecords.length}筆）`:'Yahoo Finance',
+  };
 }
 
 async function autoRefresh(){
@@ -378,7 +528,7 @@ async function refreshAll(){
   for(let i=0;i<S.holdings.length;i++){
     const h=S.holdings[i];
     showToast(`更新 ${h.code}… (${i+1}/${S.holdings.length})`,false);
-    const d=await api('/api/stock',h.code);
+    const d=await fetchStock(h.code);
     if(!d)continue;
     const c=diff(h,d);if(c.length)changes.push({code:h.code,c});
     const{lots,cost,note}=h;
@@ -435,8 +585,8 @@ async function doSearch(){
   const code=document.getElementById('search-input').value.trim().toUpperCase();
   if(!code)return;
   const el=document.getElementById('search-result');
-  el.innerHTML=`<div class="ai-loading"><span class="spinner"></span>從 TWSE 查詢 ${code}...</div>`;
-  const d=await api('/api/stock',code);
+  el.innerHTML=`<div class="ai-loading"><span class="spinner"></span>查詢 ${code}（TWSE + Yahoo）...</div>`;
+  const d=await fetchStock(code);
   if(!d){el.innerHTML='<div style="color:var(--red);font-size:13px;padding:12px 0;text-align:center">查無資料，請確認代號是否正確</div>';return;}
   const div10=10000*(+d.dividend||0);
   const nhi10=div10>THR?div10*NHI:0,net10=div10-nhi10;
@@ -498,7 +648,7 @@ async function confirmAdd(){
   if(!code||!lots){alert('請填寫代號與張數');return;}
   if(S.holdings.find(x=>x.code===code)){alert(code+' 已在持股中');return;}
   document.getElementById('add-preview').innerHTML='<div class="ai-loading"><span class="spinner"></span>從 TWSE 查詢資料...</div>';
-  const d=await api('/api/stock',code);
+  const d=await fetchStock(code);
   S.holdings.push({code,lots,cost,note,
     name:d?.name||code,type:d?.type||'股票',freq:d?.freq||'不定期',
     price:d?.price||0,change:d?.change||0,
@@ -539,7 +689,7 @@ function deleteHolding(code){
 async function refreshOne(code){
   const idx=S.holdings.findIndex(x=>x.code===code);if(idx<0)return;
   showToast('更新 '+code+'...',false);
-  const old=S.holdings[idx],d=await api('/api/stock',code);
+  const old=S.holdings[idx],d=await fetchStock(code);
   if(d){
     const c=diff(old,d);const{lots,cost,note}=old;
     S.holdings[idx]={code,lots,cost,note,...d,updatedAt:new Date().toISOString()};
