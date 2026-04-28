@@ -327,6 +327,31 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--paper);color:var(--i
     <button class="mbtn secondary" onclick="closeModal('div-modal')">取消</button>
   </div>
 </div>
+<!-- 手動輸入配息 Modal -->
+<div class="overlay" id="manual-div-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="manual-div-title">手動輸入配息</div>
+    <div style="font-size:12px;color:var(--ink3);background:var(--mist);padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;line-height:1.6">
+      適用於新上市 ETF 或 Yahoo 尚未更新的配息資料。<br>資料儲存在本機，之後 Yahoo 更新後可按「更新」自動切換。
+    </div>
+    <div class="form-group"><label class="form-lbl">除息日</label><input class="form-inp" id="mdiv-exdate" type="date" /></div>
+    <div class="form-group"><label class="form-lbl">每股配息（元）</label><input class="form-inp" id="mdiv-amount" type="number" step="0.0001" placeholder="例：0.0450" /></div>
+    <div class="form-group"><label class="form-lbl">配息日（選填）</label><input class="form-inp" id="mdiv-paydate" type="date" /></div>
+    <div class="form-group"><label class="form-lbl">配息頻率</label>
+      <select class="form-select" id="mdiv-freq">
+        <option value="月配">月配</option>
+        <option value="季配">季配</option>
+        <option value="年配">年配</option>
+        <option value="不定期">不定期</option>
+      </select>
+    </div>
+    <input type="hidden" id="mdiv-code" />
+    <button class="mbtn primary" onclick="confirmManualDiv()">新增配息記錄</button>
+    <button class="mbtn secondary" onclick="closeModal('manual-div-modal')">取消</button>
+  </div>
+</div>
+
 <div class="overlay" id="user-modal">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -503,13 +528,16 @@ async function fetchStock(code){
     dividend: div,
     annualDividend: annDiv,
     annualYield, currentYield,
+    prevYearYield: 0,  // 由 Worker 補充
+    prevYear: new Date().getFullYear()-1,
     exDate: latest.exDate||'',
     payDate: latest.payDate||'',
     nextExDate: estimateNext(latest.exDate,freq),
     dividendHistory: divRecords.slice(0,24),
     thisYearCount,
+    needsManualInput: divRecords.length===0,
     updatedAt: new Date().toISOString(),
-    source: divRecords.length?`TWSE/TPEx（${divRecords.length}筆）`:'Yahoo Finance',
+    source: divRecords.length?`TWSE/TPEx（${divRecords.length}筆）`:'查無配息（請手動輸入）',
   };
 }
 
@@ -654,9 +682,12 @@ async function confirmAdd(){
     price:d?.price||0,change:d?.change||0,
     dividend:d?.dividend||0,annualDividend:d?.annualDividend||0,
     annualYield:d?.annualYield||0,currentYield:d?.currentYield||0,
+    prevYearYield:d?.prevYearYield||0,prevYear:d?.prevYear||0,
     incomeRatio:d?.incomeRatio||100,
     exDate:d?.exDate||'',payDate:d?.payDate||'',nextExDate:d?.nextExDate||'',
     dividendHistory:d?.dividendHistory||[],
+    manualDividends:[],
+    needsManualInput:d?.needsManualInput||false,
     updatedAt:new Date().toISOString()
   });
   save();renderAll();
@@ -691,8 +722,15 @@ async function refreshOne(code){
   showToast('更新 '+code+'...',false);
   const old=S.holdings[idx],d=await fetchStock(code);
   if(d){
-    const c=diff(old,d);const{lots,cost,note}=old;
-    S.holdings[idx]={code,lots,cost,note,...d,updatedAt:new Date().toISOString()};
+    const c=diff(old,d);const{lots,cost,note,manualDividends}=old;
+    // 保留手動輸入的配息記錄
+    const merged = [...(manualDividends||[]), ...(d.dividendHistory||[]).filter(r=>!r.manual)];
+    merged.sort((a,b)=>b.exDate.localeCompare(a.exDate));
+    S.holdings[idx]={code,lots,cost,note,...d,
+      manualDividends:manualDividends||[],
+      dividendHistory:merged,
+      needsManualInput: d.needsManualInput && !(manualDividends?.length),
+      updatedAt:new Date().toISOString()};
     S.lastRefreshTs=Date.now();save();renderAll();
     showToast(c.length?`${code}: ${c.join('、')}`:`${code} 已更新，無變動`,true,3000);
   }else showToast(code+' 更新失敗，請檢查網路',true,2500);
@@ -727,18 +765,24 @@ function renderHoldings(){
       <div class="sc-metrics">
         <div class="sm"><div class="sm-lbl">每股配息</div><div class="sm-val">NT$ ${h.dividend?(+h.dividend).toFixed(4):'—'}</div></div>
         <div class="sm"><div class="sm-lbl">扣健保後實拿</div><div class="sm-val g">${div?fmt(net):'—'}</div></div>
-        <div class="sm"><div class="sm-lbl">當年累計殖利率</div><div class="sm-val g">${h.annualYield?(+h.annualYield).toFixed(2)+'%':'—'}</div></div>
+        <div class="sm"><div class="sm-lbl">今年累計殖利率</div><div class="sm-val g">${h.annualYield?(+h.annualYield).toFixed(2)+'%':'—'}</div></div>
+        <div class="sm"><div class="sm-lbl">去年(${h.prevYear||'—'})殖利率</div><div class="sm-val teal">${h.prevYearYield?(+h.prevYearYield).toFixed(2)+'%':'—'}</div></div>
         <div class="sm"><div class="sm-lbl">二代健保費</div><div class="sm-val r">${nhi>0?fmt(nhi):'免課'}</div></div>
         <div class="sm"><div class="sm-lbl">除息日</div><div class="sm-val gold">${h.exDate||'—'}</div></div>
         <div class="sm"><div class="sm-lbl">下次除息（預估）</div><div class="sm-val gold">${h.nextExDate||'—'}</div></div>
         ${pnl!==null?`<div class="sm"><div class="sm-lbl">損益</div><div class="sm-val ${pnl>=0?'r':'g'}">${fmt(pnl)} <span style="font-size:10px">(${pnlP.toFixed(2)}%)</span></div></div>`:''}
         <div class="sm"><div class="sm-lbl">持倉市值</div><div class="sm-val">${fmt(mv)}</div></div>
       </div>
+      ${h.needsManualInput?`<div style="background:var(--gold-lt);border:1px solid rgba(200,151,42,0.3);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;color:var(--gold-dk)">⚠️ Yahoo 尚無配息資料</span>
+        <button onclick="openManualDivModal('${h.code}')" style="font-size:11px;padding:4px 10px;border-radius:var(--radius-sm);border:1px solid var(--gold);background:transparent;color:var(--gold-dk);cursor:pointer">手動輸入</button>
+      </div>`:''}
       <div class="sc-footer">
         <div class="sc-lots">持有 <strong>${h.lots}</strong> 張${h.cost?' ｜ 成本 NT$'+(+h.cost).toFixed(2):''}</div>
         <div class="sc-acts">
           <button class="sc-act" onclick="refreshOne('${h.code}')">更新</button>
           <button class="sc-act" onclick="openEditModal('${h.code}')">編輯</button>
+          <button class="sc-act" onclick="openManualDivModal('${h.code}')">＋配息</button>
           <button class="sc-act del" onclick="deleteHolding('${h.code}')">刪除</button>
         </div>
       </div>
@@ -947,6 +991,78 @@ function exportHistCSV(){
 }
 
 function exportCSV(){ exportHistCSV(); }
+
+// ── 手動輸入配息 ──
+function openManualDivModal(code) {
+  const h = S.holdings.find(x=>x.code===code);
+  if (!h) return;
+  document.getElementById('mdiv-code').value = code;
+  document.getElementById('manual-div-title').textContent = '手動輸入配息 — ' + code + ' ' + (h.name||'');
+  document.getElementById('mdiv-exdate').value = '';
+  document.getElementById('mdiv-amount').value = '';
+  document.getElementById('mdiv-paydate').value = '';
+  document.getElementById('mdiv-freq').value = h.freq||'月配';
+  openModal('manual-div-modal');
+}
+
+function confirmManualDiv() {
+  const code    = document.getElementById('mdiv-code').value;
+  const exDate  = document.getElementById('mdiv-exdate').value;
+  const amount  = parseFloat(document.getElementById('mdiv-amount').value)||0;
+  const payDate = document.getElementById('mdiv-paydate').value;
+  const freq    = document.getElementById('mdiv-freq').value;
+
+  if (!exDate || !amount) { alert('請填寫除息日和配息金額'); return; }
+
+  const idx = S.holdings.findIndex(x=>x.code===code);
+  if (idx<0) return;
+
+  const h = S.holdings[idx];
+  const year = parseInt(exDate.slice(0,4));
+
+  // 加入手動配息記錄
+  if (!h.manualDividends) h.manualDividends = [];
+  // 避免重複
+  const exists = h.manualDividends.find(d=>d.exDate===exDate);
+  if (!exists) {
+    h.manualDividends.unshift({ exDate, payDate, dividend: amount, year, manual: true });
+    h.manualDividends.sort((a,b)=>b.exDate.localeCompare(a.exDate));
+  }
+
+  // 更新持股主資料
+  h.freq = freq;
+  h.dividend = amount;
+  h.dividendHistory = [...h.manualDividends, ...(h.dividendHistory||[]).filter(d=>!d.manual)];
+  h.latestExDate = h.dividendHistory[0]?.exDate || exDate;
+  h.nextExDate = estimateNextLocal(exDate, freq);
+  h.needsManualInput = false;
+
+  // 重新計算殖利率
+  const price = h.price||0;
+  const mult = freq==='月配'?12:freq==='季配'?4:1;
+  h.currentYield = price ? +(amount/price*100*mult).toFixed(2) : 0;
+
+  // 當年累計
+  const curYear = new Date().getFullYear();
+  const thisYrDivs = h.dividendHistory.filter(d=>d.year===curYear);
+  const annDiv = +thisYrDivs.reduce((s,d)=>s+(d.dividend||0),0).toFixed(4);
+  h.annualDividend = annDiv;
+  h.annualYield = price ? +(annDiv/price*100).toFixed(2) : 0;
+
+  save(); renderAll();
+  closeModal('manual-div-modal');
+  showToast(code + ' 配息已新增：NT$' + amount + '/股', true, 3000);
+}
+
+function estimateNextLocal(last, freq) {
+  if (!last) return '';
+  const days = {月配:30,季配:91,年配:365,不定期:365};
+  const d = new Date(last);
+  if (isNaN(d.getTime())) return '';
+  d.setDate(d.getDate()+(days[freq]||365));
+  if (d<new Date()) d.setDate(d.getDate()+(days[freq]||365));
+  return d.toISOString().slice(0,10);
+}
 
 function renderAll(){renderHoldings();renderSummary();renderUpcoming();renderAlerts();}
 load();
