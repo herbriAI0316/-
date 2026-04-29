@@ -299,6 +299,10 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--paper);color:var(--i
       <div style="font-size:12px;color:var(--gold-dk);font-weight:500;margin-bottom:10px">⚠️ 查無配息記錄，請手動輸入</div>
       <div class="form-group" style="margin-bottom:8px"><label class="form-lbl">每股配息（元）</label><input class="form-inp" id="add-div-amount" type="number" step="0.0001" placeholder="例：0.0450" /></div>
       <div class="form-group" style="margin-bottom:8px"><label class="form-lbl">除息日</label><input class="form-inp" id="add-div-exdate" type="date" /></div>
+      <div class="form-group" style="margin-bottom:8px"><label class="form-lbl">股利所得占比（%）</label>
+        <input class="form-inp" id="add-div-ratio" type="number" step="0.01" placeholder="例：100（一般為100%，部分ETF較低）" value="100" />
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px">影響二代健保計算基礎。多數ETF為100%，可查投信公告</div>
+      </div>
       <div class="form-group" style="margin-bottom:0"><label class="form-lbl">配息頻率</label>
         <select class="form-select" id="add-div-freq">
           <option value="月配">月配</option>
@@ -644,12 +648,15 @@ function handleAddSubmit(){
     const amount  = parseFloat(document.getElementById('add-div-amount').value)||0;
     const exDate  = document.getElementById('add-div-exdate').value;
     const freq    = document.getElementById('add-div-freq').value;
+    const ratio   = parseFloat(document.getElementById('add-div-ratio').value)||100;
     if(!amount||!exDate){ alert('請填寫每股配息金額和除息日'); return; }
     const code = document.getElementById('add-code').value.trim().toUpperCase();
     const lots = parseFloat(document.getElementById('add-lots').value)||0;
     const cost = parseFloat(document.getElementById('add-cost').value)||0;
     const note = document.getElementById('add-note').value.trim();
-    doAddHolding(code, lots, cost, note, window._pendingStock||{name:code,price:0,type:'ETF',needsManualInput:false}, {amount,exDate,freq});
+    // 確保 _pendingStock 有資料
+    const baseData = window._pendingStock || { name:code, price:0, type:'ETF(上櫃)', needsManualInput:false };
+    doAddHolding(code, lots, cost, note, baseData, {amount, exDate, freq, ratio});
     return;
   }
   confirmAdd();
@@ -699,18 +706,18 @@ function doAddHolding(code, lots, cost, note, d, manualDiv){
     const yr   = parseInt(manualDiv.exDate?.slice(0,4))||new Date().getFullYear();
     divHistory = [{ exDate:manualDiv.exDate, payDate:'', dividend:manualDiv.amount, year:yr, manual:true }];
     needsManual = false;
-    // 重新計算殖利率
     const price = d?.price||0;
     const mult  = freq==='月配'?12:freq==='季配'?4:1;
     d = d||{};
-    d.currentYield = price ? +(dividend/price*100*mult).toFixed(2) : 0;
+    d.currentYield   = price ? +(dividend/price*100*mult).toFixed(2) : 0;
     d.annualDividend = dividend;
     d.annualYield    = price ? +(dividend/price*100).toFixed(2) : 0;
+    d.incomeRatio    = manualDiv.ratio||100;
   }
 
   const holding = {
     code, lots, cost, note,
-    name:d?.name||code, type:d?.type||'股票', freq,
+    name:d?.name||code, type:d?.type||'ETF(上櫃)', freq,
     price:d?.price||0, change:d?.change||0,
     dividend,
     annualDividend:d?.annualDividend||0,
@@ -718,7 +725,7 @@ function doAddHolding(code, lots, cost, note, d, manualDiv){
     currentYield:d?.currentYield||0,
     prevYearYield:d?.prevYearYield||0,
     prevYear:d?.prevYear||0,
-    incomeRatio:100,
+    incomeRatio:d?.incomeRatio||100,
     exDate, payDate:'', nextExDate,
     dividendHistory: divHistory,
     manualDividends: manualDiv ? [{ exDate:manualDiv.exDate, payDate:'', dividend:manualDiv.amount, year:parseInt(manualDiv.exDate?.slice(0,4))||new Date().getFullYear(), manual:true }] : [],
@@ -810,6 +817,7 @@ function renderHoldings(){
       </div>
       <div class="sc-metrics">
         <div class="sm"><div class="sm-lbl">每股配息</div><div class="sm-val">NT$ ${h.dividend?(+h.dividend).toFixed(4):'—'}</div></div>
+        <div class="sm"><div class="sm-lbl">股利所得占比</div><div class="sm-val">${h.incomeRatio||100}%<span style="font-size:10px;color:var(--ink3)">（${((h.dividend||0)*(h.incomeRatio||100)/100).toFixed(4)}元/股）</span></div></div>
         <div class="sm"><div class="sm-lbl">扣健保後實拿</div><div class="sm-val g">${div?fmt(net):'—'}</div></div>
         <div class="sm"><div class="sm-lbl">今年累計殖利率</div><div class="sm-val g">${h.annualYield?(+h.annualYield).toFixed(2)+'%':'—'}</div></div>
         <div class="sm"><div class="sm-lbl">去年(${h.prevYear||'—'})殖利率</div><div class="sm-val teal">${h.prevYearYield?(+h.prevYearYield).toFixed(2)+'%':'—'}</div></div>
