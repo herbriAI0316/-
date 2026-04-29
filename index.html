@@ -293,7 +293,23 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--paper);color:var(--i
     <div class="form-group"><label class="form-lbl">平均買入成本（元／股，選填）</label><input class="form-inp" id="add-cost" type="number" placeholder="例：42.50" step="0.01" /></div>
     <div class="form-group"><label class="form-lbl">備註（選填）</label><input class="form-inp" id="add-note" placeholder="例：定期定額、長期存股" /></div>
     <div id="add-preview"></div>
-    <button class="mbtn primary" onclick="confirmAdd()">查詢並加入持股</button>
+
+    <!-- 手動輸入配息（查不到時展開）-->
+    <div id="add-manual-section" style="display:none;background:var(--gold-lt);border:1px solid rgba(200,151,42,0.3);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--gold-dk);font-weight:500;margin-bottom:10px">⚠️ 查無配息記錄，請手動輸入</div>
+      <div class="form-group" style="margin-bottom:8px"><label class="form-lbl">每股配息（元）</label><input class="form-inp" id="add-div-amount" type="number" step="0.0001" placeholder="例：0.0450" /></div>
+      <div class="form-group" style="margin-bottom:8px"><label class="form-lbl">除息日</label><input class="form-inp" id="add-div-exdate" type="date" /></div>
+      <div class="form-group" style="margin-bottom:0"><label class="form-lbl">配息頻率</label>
+        <select class="form-select" id="add-div-freq">
+          <option value="月配">月配</option>
+          <option value="季配">季配</option>
+          <option value="年配">年配</option>
+          <option value="不定期">不定期</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="mbtn primary" id="add-submit-btn" onclick="handleAddSubmit()">查詢並加入持股</button>
     <button class="mbtn secondary" onclick="closeModal('add-modal')">取消</button>
   </div>
 </div>
@@ -606,6 +622,24 @@ function addFromSearch(code){
   openModal('add-modal');
 }
 
+function handleAddSubmit(){
+  // 如果手動輸入區塊是展開的，代表是「填完配息後加入」
+  const manualSection = document.getElementById('add-manual-section');
+  if(manualSection.style.display !== 'none'){
+    const amount  = parseFloat(document.getElementById('add-div-amount').value)||0;
+    const exDate  = document.getElementById('add-div-exdate').value;
+    const freq    = document.getElementById('add-div-freq').value;
+    if(!amount||!exDate){ alert('請填寫每股配息金額和除息日'); return; }
+    const code = document.getElementById('add-code').value.trim().toUpperCase();
+    const lots = parseFloat(document.getElementById('add-lots').value)||0;
+    const cost = parseFloat(document.getElementById('add-cost').value)||0;
+    const note = document.getElementById('add-note').value.trim();
+    doAddHolding(code, lots, cost, note, window._pendingStock||{name:code,price:0,type:'ETF',needsManualInput:false}, {amount,exDate,freq});
+    return;
+  }
+  confirmAdd();
+}
+
 async function confirmAdd(){
   const code=document.getElementById('add-code').value.trim().toUpperCase();
   const lots=parseFloat(document.getElementById('add-lots').value)||0;
@@ -613,25 +647,84 @@ async function confirmAdd(){
   const note=document.getElementById('add-note').value.trim();
   if(!code||!lots){alert('請填寫代號與張數');return;}
   if(S.holdings.find(x=>x.code===code)){alert(code+' 已在持股中');return;}
-  document.getElementById('add-preview').innerHTML='<div class="ai-loading"><span class="spinner"></span>從 TWSE 查詢資料...</div>';
-  const d=await fetchStock(code);
-  S.holdings.push({code,lots,cost,note,
-    name:d?.name||code,type:d?.type||'股票',freq:d?.freq||'不定期',
-    price:d?.price||0,change:d?.change||0,
-    dividend:d?.dividend||0,annualDividend:d?.annualDividend||0,
-    annualYield:d?.annualYield||0,currentYield:d?.currentYield||0,
-    prevYearYield:d?.prevYearYield||0,prevYear:d?.prevYear||0,
-    incomeRatio:d?.incomeRatio||100,
-    exDate:d?.exDate||'',payDate:d?.payDate||'',nextExDate:d?.nextExDate||'',
-    dividendHistory:d?.dividendHistory||[],
-    manualDividends:[],
-    needsManualInput:d?.needsManualInput||false,
+
+  document.getElementById('add-preview').innerHTML='<div class="ai-loading"><span class="spinner"></span>查詢 '+code+' 資料中...</div>';
+
+  const d = await fetchStock(code);
+
+  // 查不到配息時，顯示手動輸入區塊，讓使用者填完再加入
+  if(d?.needsManualInput){
+    document.getElementById('add-preview').innerHTML='<div style="font-size:12px;color:var(--teal);padding:6px 0">✓ 股價已取得：NT$ '+(d?.price||0)+'，請填寫下方配息資料後再加入</div>';
+    document.getElementById('add-manual-section').style.display='block';
+    // 換按鈕文字
+    document.querySelector('#add-modal .mbtn.primary').textContent='填完配息後加入';
+    // 保存暫存資料
+    window._pendingStock = d;
+    return; // 等使用者填完再繼續
+  }
+
+  // 有配息資料，直接加入
+  doAddHolding(code, lots, cost, note, d, null);
+}
+
+function doAddHolding(code, lots, cost, note, d, manualDiv){
+  // 整合手動配息
+  let dividend    = d?.dividend||0;
+  let freq        = d?.freq||'不定期';
+  let exDate      = d?.exDate||'';
+  let nextExDate  = d?.nextExDate||'';
+  let divHistory  = d?.dividendHistory||[];
+  let needsManual = d?.needsManualInput||false;
+
+  if(manualDiv){
+    dividend   = manualDiv.amount;
+    freq       = manualDiv.freq;
+    exDate     = manualDiv.exDate;
+    nextExDate = estimateNextLocal(manualDiv.exDate, manualDiv.freq);
+    const yr   = parseInt(manualDiv.exDate?.slice(0,4))||new Date().getFullYear();
+    divHistory = [{ exDate:manualDiv.exDate, payDate:'', dividend:manualDiv.amount, year:yr, manual:true }];
+    needsManual = false;
+    // 重新計算殖利率
+    const price = d?.price||0;
+    const mult  = freq==='月配'?12:freq==='季配'?4:1;
+    d = d||{};
+    d.currentYield = price ? +(dividend/price*100*mult).toFixed(2) : 0;
+    d.annualDividend = dividend;
+    d.annualYield    = price ? +(dividend/price*100).toFixed(2) : 0;
+  }
+
+  const holding = {
+    code, lots, cost, note,
+    name:d?.name||code, type:d?.type||'股票', freq,
+    price:d?.price||0, change:d?.change||0,
+    dividend,
+    annualDividend:d?.annualDividend||0,
+    annualYield:d?.annualYield||0,
+    currentYield:d?.currentYield||0,
+    prevYearYield:d?.prevYearYield||0,
+    prevYear:d?.prevYear||0,
+    incomeRatio:100,
+    exDate, payDate:'', nextExDate,
+    dividendHistory: divHistory,
+    manualDividends: manualDiv ? [{ exDate:manualDiv.exDate, payDate:'', dividend:manualDiv.amount, year:parseInt(manualDiv.exDate?.slice(0,4))||new Date().getFullYear(), manual:true }] : [],
+    needsManualInput: needsManual,
     updatedAt:new Date().toISOString()
-  });
-  save();renderAll();
+  };
+
+  S.holdings.push(holding);
+  save(); renderAll();
+
+  // 清空
   document.getElementById('add-preview').innerHTML='';
-  ['add-code','add-lots','add-cost','add-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('add-manual-section').style.display='none';
+  document.querySelector('#add-modal .mbtn.primary').textContent='查詢並加入持股';
+  ['add-code','add-lots','add-cost','add-note','add-div-amount','add-div-exdate'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  window._pendingStock = null;
   closeModal('add-modal');
+
+  showToast(code + (needsManual?'（待手動輸入配息）':' 已加入持股'), true, 2500);
 }
 
 function openEditModal(code){
