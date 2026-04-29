@@ -402,11 +402,13 @@ function load(){
 function save(){try{localStorage.setItem(STORE,JSON.stringify(S))}catch(e){}}
 const fmt=n=>n?'NT$ '+Math.round(n).toLocaleString():'—';
 
-// ── 股價：透過 Worker 查 Yahoo Finance ──
+// ── 股價：透過 Worker 查 Yahoo Finance（自動試 .TW / .TWO）──
 async function fetchPrice(code){
   try{
     const r=await fetch(`${WORKER}/api/price?code=${encodeURIComponent(code)}`);
-    const j=await r.json();return j.ok?j.data:null;
+    const j=await r.json();
+    if(j.ok && j.data?.price) return j.data;
+    return null;
   }catch(e){return null}
 }
 
@@ -461,51 +463,45 @@ function estimateNext(last,freq){
 // 整合查詢：股價（Worker）+ 除權息（瀏覽器直接抓）
 async function fetchStock(code){
   showToast('查詢 '+code+'...',false);
-
-  // 設定 15 秒超時保護
-  const timeout = setTimeout(()=>showToast(code+' 查詢逾時，請重試',true,3000), 15000);
-
   try{
-  // 同時查股價和配息
-  const [priceData, divRecords] = await Promise.all([
-    fetchPrice(code),
-    fetchDividends(code),
-  ]);
-  clearTimeout(timeout);
+    // 同時查股價和配息（各自有獨立的錯誤處理）
+    const [priceData, ex] = await Promise.all([
+      fetchPrice(code).catch(()=>null),
+      fetchDividends(code).catch(()=>null),
+    ]);
 
-  // divRecords 現在是 Worker 回傳的整個 exright 物件
-  const ex = divRecords; // Worker 回傳完整資料
-  const price=priceData?.price||0;
+    // 查詢完成，關閉 toast
+    showToast(code+' 查詢完成', true, 1500);
 
-  return {
-    code,
-    name: priceData?.name||code,
-    type: /[A-Z]/.test(code)?'ETF(上櫃)':/^(0[0-9]{3,5}|006[0-9]{3})$/.test(code)?'ETF':'股票',
-    freq: ex?.freq||'不定期',
-    price,
-    change: priceData?.change||0,
-    high: priceData?.high||0,
-    low: priceData?.low||0,
-    volume: priceData?.volume||0,
-    dividend: ex?.latestDividend||0,
-    annualDividend: ex?.annualDividend||0,
-    annualYield: ex?.annualYield||0,
-    currentYield: ex?.currentYield||0,
-    prevYearYield: ex?.prevYearYield||0,
-    prevYear: ex?.prevYear||new Date().getFullYear()-1,
-    exDate: ex?.latestExDate||'',
-    payDate: ex?.latestPayDate||'',
-    nextExDate: ex?.nextExDate||'',
-    dividendHistory: ex?.records||[],
-    thisYearCount: ex?.thisYearCount||0,
-    needsManualInput: ex?.needsManualInput||false,
-    updatedAt: new Date().toISOString(),
-    source: ex?.source||'Yahoo Finance',
-  };
+    const price = priceData?.price||0;
+    return {
+      code,
+      name: priceData?.name||code,
+      type: /[A-Z]/.test(code)?'ETF(上櫃)':/^(0[0-9]{3,5}|006[0-9]{3})$/.test(code)?'ETF':'股票',
+      freq: ex?.freq||'不定期',
+      price,
+      change: priceData?.change||0,
+      high: priceData?.high||0,
+      low: priceData?.low||0,
+      volume: priceData?.volume||0,
+      dividend: ex?.latestDividend||0,
+      annualDividend: ex?.annualDividend||0,
+      annualYield: ex?.annualYield||0,
+      currentYield: ex?.currentYield||0,
+      prevYearYield: ex?.prevYearYield||0,
+      prevYear: ex?.prevYear||new Date().getFullYear()-1,
+      exDate: ex?.latestExDate||'',
+      payDate: ex?.latestPayDate||'',
+      nextExDate: ex?.nextExDate||'',
+      dividendHistory: ex?.records||[],
+      thisYearCount: ex?.thisYearCount||0,
+      needsManualInput: !ex || ex?.needsManualInput||false,
+      updatedAt: new Date().toISOString(),
+      source: ex?.source||'Yahoo Finance',
+    };
   } catch(e) {
-    clearTimeout(timeout);
-    showToast(code+' 查詢失敗：'+e.message, true, 3000);
-    return null;
+    showToast(code+' 查詢失敗', true, 3000);
+    return { code, name:code, needsManualInput:true, price:0 };
   }
 }
 
