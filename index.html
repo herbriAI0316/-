@@ -606,7 +606,7 @@ async function doSearch(){
       </div>
       <div>
         <div style="font-size:17px;font-weight:500">NT$ ${(+d.price).toFixed(2)}</div>
-        ${chg!==0?`<div class="sc-chg ${chg>=0?'up':'dn'}" style="text-align:right">${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(2)}%</div>`:''}
+        ${chg!==0?`<div class="sc-chg ${chg>=0?'up':'dn'}" style="text-align:right">${chg>=0?'▲':'▼'}${(+Math.abs(chg)||0).toFixed(2)}%</div>`:''}
       </div>
     </div>
     <div class="res-metrics">
@@ -805,8 +805,8 @@ function renderHoldings(){
     const nhi=div>THR?div*NHI:0,net=div-nhi;
     const mv=h.lots*1000*(+h.price||0);
     const cb=h.cost?h.lots*1000*h.cost:0;
-    const pnl=cb?mv-cb:null,pnlP=cb&&h.price?((+h.price-h.cost)/h.cost*100):null;
-    const chg=parseFloat(h.change||0);
+    const pnl=(cb&&h.price>0)?mv-cb:null,pnlP=(cb&&h.price>0&&h.cost>0)?((+h.price-h.cost)/h.cost*100):null;
+    const chg=parseFloat(h.change)||0;
     const ts=h.updatedAt?new Date(h.updatedAt).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
     return`<div class="stock-card">
       <div class="sc-top">
@@ -816,19 +816,19 @@ function renderHoldings(){
         </div>
         <div class="sc-right">
           <div class="sc-price">NT$ ${h.price?(+h.price).toFixed(2):'—'}</div>
-          ${chg!==0?`<div class="sc-chg ${chg>=0?'up':'dn'}">${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(2)}%</div>`:''}
+          ${chg!==0?`<div class="sc-chg ${chg>=0?'up':'dn'}">${chg>=0?'▲':'▼'}${(+Math.abs(chg)||0).toFixed(2)}%</div>`:''}
         </div>
       </div>
       <div class="sc-metrics">
         <div class="sm"><div class="sm-lbl">每股配息</div><div class="sm-val">NT$ ${h.dividend?(+h.dividend).toFixed(4):'—'}</div></div>
         <div class="sm"><div class="sm-lbl">股利所得占比</div><div class="sm-val">${h.incomeRatio||100}%<span style="font-size:10px;color:var(--ink3)">（${(+(h.dividend||0)*(+(h.incomeRatio||100))/100).toFixed(4)}元/股）</span></div></div>
         <div class="sm"><div class="sm-lbl">扣健保後實拿</div><div class="sm-val g">${div?fmt(net):'—'}</div></div>
-        <div class="sm"><div class="sm-lbl">今年累計殖利率</div><div class="sm-val g">${h.annualYield?(+h.annualYield).toFixed(2)+'%':'—'}</div></div>
-        <div class="sm"><div class="sm-lbl">去年(${h.prevYear||'—'})殖利率</div><div class="sm-val teal">${h.prevYearYield?(+h.prevYearYield).toFixed(2)+'%':'—'}</div></div>
+        <div class="sm"><div class="sm-lbl">今年累計殖利率</div><div class="sm-val g">${h.annualYield?(+(+h.annualYield||0)).toFixed(2)+'%':'—'}</div></div>
+        <div class="sm"><div class="sm-lbl">去年(${h.prevYear||'—'})殖利率</div><div class="sm-val teal">${h.prevYearYield?(+(+h.prevYearYield||0)).toFixed(2)+'%':'—'}</div></div>
         <div class="sm"><div class="sm-lbl">二代健保費</div><div class="sm-val r">${nhi>0?fmt(nhi):'免課'}</div></div>
         <div class="sm"><div class="sm-lbl">除息日</div><div class="sm-val gold">${h.exDate||'—'}</div></div>
         <div class="sm"><div class="sm-lbl">下次除息（預估）</div><div class="sm-val gold">${h.nextExDate||'—'}</div></div>
-        ${(pnl!==null&&pnlP!==null)?`<div class="sm"><div class="sm-lbl">損益</div><div class="sm-val ${pnl>=0?'r':'g'}">${fmt(pnl)} <span style="font-size:10px">(${pnlP!=null?(+pnlP).toFixed(2):'0'}%)</span></div></div>`:''}
+        ${(pnl!==null&&pnlP!==null)?`<div class="sm"><div class="sm-lbl">損益</div><div class="sm-val ${pnl>=0?'r':'g'}">${fmt(pnl)} <span style="font-size:10px">(${(!pnlP||isNaN(pnlP))?'—':(+pnlP).toFixed(2)}%)</span></div></div>`:''}
         <div class="sm"><div class="sm-lbl">持倉市值</div><div class="sm-val">${fmt(mv)}</div></div>
       </div>
       ${h.needsManualInput?`<div style="background:var(--gold-lt);border:1px solid rgba(200,151,42,0.3);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
@@ -836,7 +836,7 @@ function renderHoldings(){
         <button onclick="openManualDivModal('${h.code}')" style="font-size:11px;padding:4px 10px;border-radius:var(--radius-sm);border:1px solid var(--gold);background:transparent;color:var(--gold-dk);cursor:pointer">手動輸入</button>
       </div>`:''}
       <div class="sc-footer">
-        <div class="sc-lots">持有 <strong>${h.lots}</strong> 張${h.cost?' ｜ 成本 NT$'+(+h.cost).toFixed(2):''}</div>
+        <div class="sc-lots">持有 <strong>${h.lots}</strong> 張${h.cost?' ｜ 成本 NT$'+(+h.cost||0).toFixed(2):''}</div>
         <div class="sc-acts">
           <button class="sc-act" onclick="refreshOne('${h.code}')">更新</button>
           <button class="sc-act" onclick="openEditModal('${h.code}')">編輯</button>
