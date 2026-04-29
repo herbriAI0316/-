@@ -378,6 +378,10 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--paper);color:var(--i
     <div class="form-group"><label class="form-lbl">除息提前提醒天數</label><input class="form-inp" id="u-alert" type="number" value="7" min="1" max="60" /></div>
     <button class="mbtn primary" onclick="saveUser()">儲存設定</button>
     <button class="mbtn secondary" onclick="closeModal('user-modal')">取消</button>
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:8px">危險操作</div>
+      <button onclick="clearAllData()" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--red);background:transparent;color:var(--red);font-size:13px;cursor:pointer;font-family:inherit">清除所有持股資料（重新開始）</button>
+    </div>
   </div>
 </div>
 
@@ -458,11 +462,16 @@ function estimateNext(last,freq){
 async function fetchStock(code){
   showToast('查詢 '+code+'...',false);
 
+  // 設定 15 秒超時保護
+  const timeout = setTimeout(()=>showToast(code+' 查詢逾時，請重試',true,3000), 15000);
+
+  try{
   // 同時查股價和配息
   const [priceData, divRecords] = await Promise.all([
     fetchPrice(code),
     fetchDividends(code),
   ]);
+  clearTimeout(timeout);
 
   // divRecords 現在是 Worker 回傳的整個 exright 物件
   const ex = divRecords; // Worker 回傳完整資料
@@ -493,6 +502,11 @@ async function fetchStock(code){
     updatedAt: new Date().toISOString(),
     source: ex?.source||'Yahoo Finance',
   };
+  } catch(e) {
+    clearTimeout(timeout);
+    showToast(code+' 查詢失敗：'+e.message, true, 3000);
+    return null;
+  }
 }
 
 async function autoRefresh(){
@@ -529,12 +543,17 @@ function diff(o,n){
   return out;
 }
 
+let _toastTimer=null;
 function showToast(msg,done,ms){
   const t=document.getElementById('toast');
+  if(_toastTimer){clearTimeout(_toastTimer);_toastTimer=null;}
   t.classList.remove('fade');t.classList.add('show');
   document.getElementById('toast-spin').style.display=done?'none':'block';
   document.getElementById('toast-msg').textContent=msg;
-  if(done&&ms)setTimeout(()=>{t.classList.add('fade');setTimeout(()=>t.classList.remove('show','fade'),450)},ms);
+  if(done){
+    const delay=ms||3000;
+    _toastTimer=setTimeout(()=>{t.classList.add('fade');setTimeout(()=>t.classList.remove('show','fade'),450)},delay);
+  }
 }
 function timeSince(ts){const m=Math.floor((Date.now()-ts)/60000);return m<1?'剛才':m<60?m+'分鐘':Math.floor(m/60)+'小時'}
 function updateLabel(){const e=document.getElementById('update-label');if(S.lastRefreshTs)e.textContent=timeSince(S.lastRefreshTs)+'前'}
@@ -1093,6 +1112,15 @@ function estimateNextLocal(last, freq) {
   d.setDate(d.getDate()+(days[freq]||365));
   if (d<new Date()) d.setDate(d.getDate()+(days[freq]||365));
   return d.toISOString().slice(0,10);
+}
+
+function clearAllData(){
+  if(!confirm('確定要清除所有持股資料嗎？此操作無法復原！')) return;
+  localStorage.removeItem(STORE);
+  S={user:{name:'',alertDays:7},holdings:[],history:[]};
+  save(); syncUser(); renderAll();
+  closeModal('user-modal');
+  showToast('所有資料已清除',true,2500);
 }
 
 function renderAll(){renderHoldings();renderSummary();renderUpcoming();renderAlerts();}
