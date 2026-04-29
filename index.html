@@ -674,29 +674,33 @@ async function confirmAdd(){
 
   const d = await fetchStock(code);
 
-  // 查不到配息時，顯示手動輸入區塊，讓使用者填完再加入
-  if(d?.needsManualInput){
-    document.getElementById('add-preview').innerHTML='<div style="font-size:12px;color:var(--teal);padding:6px 0">✓ 股價已取得：NT$ '+(d?.price||0)+'，請填寫下方配息資料後再加入</div>';
+  // fetchStock 失敗 或 查無配息 → 顯示手動輸入
+  if(!d || d?.needsManualInput){
+    const price = d?.price||0;
+    document.getElementById('add-preview').innerHTML=
+      '<div style="font-size:12px;color:var(--teal);padding:6px 0">'
+      +(price>0?'✓ 股價已取得：NT$ '+price+'，請填寫下方配息資料後再加入':'查無股價，請填寫下方配息資料後再加入')
+      +'</div>';
     document.getElementById('add-manual-section').style.display='block';
-    // 換按鈕文字
-    document.querySelector('#add-modal .mbtn.primary').textContent='填完配息後加入';
-    // 保存暫存資料
-    window._pendingStock = d;
-    return; // 等使用者填完再繼續
+    document.getElementById('add-submit-btn').textContent='填完配息後加入';
+    window._pendingStock = d || { name:code, price:0, type:'ETF(上櫃)', needsManualInput:false };
+    return;
   }
 
-  // 有配息資料，直接加入
+  // 有完整資料，直接加入
   doAddHolding(code, lots, cost, note, d, null);
 }
 
 function doAddHolding(code, lots, cost, note, d, manualDiv){
+  // d 可能為 null，統一用空物件
+  d = d || { name:code, price:0, type:'ETF(上櫃)', needsManualInput:false };
   // 整合手動配息
-  let dividend    = d?.dividend||0;
-  let freq        = d?.freq||'不定期';
-  let exDate      = d?.exDate||'';
-  let nextExDate  = d?.nextExDate||'';
-  let divHistory  = d?.dividendHistory||[];
-  let needsManual = d?.needsManualInput||false;
+  let dividend    = d.dividend||0;
+  let freq        = d.freq||'不定期';
+  let exDate      = d.exDate||'';
+  let nextExDate  = d.nextExDate||'';
+  let divHistory  = d.dividendHistory||[];
+  let needsManual = d.needsManualInput||false;
 
   if(manualDiv){
     dividend   = manualDiv.amount;
@@ -739,7 +743,7 @@ function doAddHolding(code, lots, cost, note, d, manualDiv){
   // 清空
   document.getElementById('add-preview').innerHTML='';
   document.getElementById('add-manual-section').style.display='none';
-  document.querySelector('#add-modal .mbtn.primary').textContent='查詢並加入持股';
+  document.getElementById('add-submit-btn').textContent='查詢並加入持股';
   ['add-code','add-lots','add-cost','add-note','add-div-amount','add-div-exdate'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
