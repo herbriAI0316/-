@@ -390,74 +390,14 @@ async function fetchPrice(code){
   }catch(e){return null}
 }
 
-// ── 除權息：瀏覽器直接查 TWSE（台灣IP不被擋）──
+// ── 除權息：透過 Worker 查 Yahoo Finance（最穩定）──
 async function fetchDividends(code){
-  const year=new Date().getFullYear();
-  const now=new Date();
-  const all=[];
-
-  // 逐月掃描今年+去年+前年
-  const months=[];
-  for(const y of [year, year-1, year-2]){
-    for(let m=1;m<=12;m++){
-      if(new Date(y,m-1,1)>now) continue;
-      const lastDay=new Date(y,m,0).getDate();
-      const s=`${y}${String(m).padStart(2,'0')}01`;
-      const e=`${y}${String(m).padStart(2,'0')}${lastDay}`;
-      months.push({s,e});
-    }
-  }
-
-  // 每次查 2 個月（避免瀏覽器過多並發）
-  for(let i=0;i<months.length;i+=2){
-    const batch=months.slice(i,i+2);
-    await Promise.all(batch.map(async({s,e})=>{
-      try{
-        const url=`https://www.twse.com.tw/rwd/zh/exRight/TWT49U?response=json&strDate=${s}&endDate=${e}`;
-        const r=await fetch(url);
-        const json=await r.json();
-        if(json?.stat!=='OK') return;
-        (json?.data||[]).forEach(row=>{
-          if(!Array.isArray(row)||row.length<7) return;
-          if(String(row[1]||'').trim()!==code) return;
-          const exDate=toAD(String(row[0]||''));
-          const dividend=parseFloat(String(row[6]||0).replace(/,/g,''))||0;
-          if(!exDate) return;
-          if(!all.find(x=>x.exDate===exDate))
-            all.push({exDate,payDate:'',dividend,year:+exDate.slice(0,4)});
-        });
-      }catch(e){}
-    }));
-  }
-
-  // TWSE 沒資料時試 TPEx（上櫃，適合 00984D 等）
-  if(!all.length){
-    for(const y of [year,year-1,year-2]){
-      for(let m=1;m<=12;m++){
-        if(new Date(y,m-1,1)>now) continue;
-        try{
-          const rocY=y-1911;
-          const rocM=String(m).padStart(2,'0');
-          const lastDay=new Date(y,m,0).getDate();
-          const url=`https://www.tpex.org.tw/web/stock/exright/dailyquo/exright_result.php?l=zh-tw&d=${rocY}/${rocM}/01&ed=${rocY}/${rocM}/${lastDay}&stkno=${code}&s=0,asc&o=json`;
-          const r=await fetch(url);
-          const json=await r.json();
-          (json?.aaData||[]).forEach(row=>{
-            if(!Array.isArray(row)||row.length<5) return;
-            const rowCode=String(row[1]||'').trim();
-            if(rowCode&&rowCode!==code) return;
-            const exDate=toAD(String(row[0]||''));
-            const dividend=parseFloat(String(row[4]||0).replace(/,/g,''))||0;
-            if(!exDate) return;
-            if(!all.find(x=>x.exDate===exDate))
-              all.push({exDate,payDate:'',dividend,year:+exDate.slice(0,4)});
-          });
-        }catch(e){}
-      }
-    }
-  }
-
-  return all.sort((a,b)=>b.exDate.localeCompare(a.exDate));
+  try{
+    const r=await fetch(`${WORKER}/api/exright?code=${encodeURIComponent(code)}`);
+    const j=await r.json();
+    if(j.ok) return j.data;
+  }catch(e){}
+  return null;
 }
 
 // 日期轉換：民國 → 西元
@@ -508,36 +448,34 @@ async function fetchStock(code){
     fetchDividends(code),
   ]);
 
-  const {freq,annDiv,thisYearCount}=calcDivStats(divRecords);
-  const latest=divRecords[0]||{};
+  // divRecords 現在是 Worker 回傳的整個 exright 物件
+  const ex = divRecords; // Worker 回傳完整資料
   const price=priceData?.price||0;
-  const div=latest.dividend||0;
-  const mult=freq==='月配'?12:freq==='季配'?4:1;
-  const currentYield=(price&&div)?+(div/price*100*mult).toFixed(2):0;
-  const annualYield=(price&&annDiv)?+(annDiv/price*100).toFixed(2):0;
 
   return {
     code,
     name: priceData?.name||code,
     type: /[A-Z]/.test(code)?'ETF(上櫃)':/^(0[0-9]{3,5}|006[0-9]{3})$/.test(code)?'ETF':'股票',
-    freq, price,
+    freq: ex?.freq||'不定期',
+    price,
     change: priceData?.change||0,
     high: priceData?.high||0,
     low: priceData?.low||0,
     volume: priceData?.volume||0,
-    dividend: div,
-    annualDividend: annDiv,
-    annualYield, currentYield,
-    prevYearYield: 0,  // 由 Worker 補充
-    prevYear: new Date().getFullYear()-1,
-    exDate: latest.exDate||'',
-    payDate: latest.payDate||'',
-    nextExDate: estimateNext(latest.exDate,freq),
-    dividendHistory: divRecords.slice(0,24),
-    thisYearCount,
-    needsManualInput: divRecords.length===0,
+    dividend: ex?.latestDividend||0,
+    annualDividend: ex?.annualDividend||0,
+    annualYield: ex?.annualYield||0,
+    currentYield: ex?.currentYield||0,
+    prevYearYield: ex?.prevYearYield||0,
+    prevYear: ex?.prevYear||new Date().getFullYear()-1,
+    exDate: ex?.latestExDate||'',
+    payDate: ex?.latestPayDate||'',
+    nextExDate: ex?.nextExDate||'',
+    dividendHistory: ex?.records||[],
+    thisYearCount: ex?.thisYearCount||0,
+    needsManualInput: ex?.needsManualInput||false,
     updatedAt: new Date().toISOString(),
-    source: divRecords.length?`TWSE/TPEx（${divRecords.length}筆）`:'查無配息（請手動輸入）',
+    source: ex?.source||'Yahoo Finance',
   };
 }
 
