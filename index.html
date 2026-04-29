@@ -821,14 +821,14 @@ function renderHoldings(){
       </div>
       <div class="sc-metrics">
         <div class="sm"><div class="sm-lbl">每股配息</div><div class="sm-val">NT$ ${h.dividend?(+h.dividend).toFixed(4):'—'}</div></div>
-        <div class="sm"><div class="sm-lbl">股利所得占比</div><div class="sm-val">${h.incomeRatio||100}%<span style="font-size:10px;color:var(--ink3)">（${((h.dividend||0)*(h.incomeRatio||100)/100).toFixed(4)}元/股）</span></div></div>
+        <div class="sm"><div class="sm-lbl">股利所得占比</div><div class="sm-val">${h.incomeRatio||100}%<span style="font-size:10px;color:var(--ink3)">（${(+(h.dividend||0)*(+(h.incomeRatio||100))/100).toFixed(4)}元/股）</span></div></div>
         <div class="sm"><div class="sm-lbl">扣健保後實拿</div><div class="sm-val g">${div?fmt(net):'—'}</div></div>
         <div class="sm"><div class="sm-lbl">今年累計殖利率</div><div class="sm-val g">${h.annualYield?(+h.annualYield).toFixed(2)+'%':'—'}</div></div>
         <div class="sm"><div class="sm-lbl">去年(${h.prevYear||'—'})殖利率</div><div class="sm-val teal">${h.prevYearYield?(+h.prevYearYield).toFixed(2)+'%':'—'}</div></div>
         <div class="sm"><div class="sm-lbl">二代健保費</div><div class="sm-val r">${nhi>0?fmt(nhi):'免課'}</div></div>
         <div class="sm"><div class="sm-lbl">除息日</div><div class="sm-val gold">${h.exDate||'—'}</div></div>
         <div class="sm"><div class="sm-lbl">下次除息（預估）</div><div class="sm-val gold">${h.nextExDate||'—'}</div></div>
-        ${pnl!==null?`<div class="sm"><div class="sm-lbl">損益</div><div class="sm-val ${pnl>=0?'r':'g'}">${fmt(pnl)} <span style="font-size:10px">(${pnlP.toFixed(2)}%)</span></div></div>`:''}
+        ${(pnl!==null&&pnlP!==null)?`<div class="sm"><div class="sm-lbl">損益</div><div class="sm-val ${pnl>=0?'r':'g'}">${fmt(pnl)} <span style="font-size:10px">(${pnlP!=null?(+pnlP).toFixed(2):'0'}%)</span></div></div>`:''}
         <div class="sm"><div class="sm-lbl">持倉市值</div><div class="sm-val">${fmt(mv)}</div></div>
       </div>
       ${h.needsManualInput?`<div style="background:var(--gold-lt);border:1px solid rgba(200,151,42,0.3);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
