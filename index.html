@@ -1,1163 +1,294 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="台股存摺">
-<meta name="theme-color" content="#1a1c22">
-<title>台股存摺 — 股利・稅務・資產管理</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-:root{
-  --ink:#1a1c22;--ink2:#2d3142;--ink3:#5a6080;
-  --mist:#f4f3ef;--mist2:#eceae4;--mist3:#dddbd2;
-  --paper:#faf9f6;--white:#fff;
-  --gold:#c8972a;--gold-lt:#f5e9cc;--gold-dk:#8a6415;
-  --teal:#1a7a6e;--teal-lt:#d0ede9;
-  --red:#c0392b;--red-lt:#fde8e6;
-  --green:#1a6e42;--green-lt:#d0eddd;
-  --border:rgba(26,28,34,0.09);--border2:rgba(26,28,34,0.16);
-  --radius:14px;--radius-sm:8px;
-  --shadow:0 1px 3px rgba(26,28,34,0.07),0 4px 12px rgba(26,28,34,0.04);
-}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:'Noto Sans TC',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.6;overflow-x:hidden}
-.app{max-width:480px;margin:0 auto;padding-bottom:88px}
-#toast{position:fixed;top:0;left:0;right:0;z-index:999;max-width:480px;margin:0 auto;background:var(--ink);color:#fff;padding:10px 16px;font-size:12px;display:none;align-items:center;gap:8px;border-bottom:2px solid var(--gold);transition:opacity 0.4s}
-#toast.show{display:flex}#toast.fade{opacity:0}
-.t-spinner{width:13px;height:13px;border:2px solid rgba(255,255,255,0.2);border-top-color:var(--gold);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0}
-@keyframes spin{to{transform:rotate(360deg)}}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 12px;background:var(--paper);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
-.brand-zh{font-family:'Noto Serif TC',serif;font-size:20px;font-weight:600;letter-spacing:0.04em}
-.brand-sub{font-size:10px;color:var(--ink3);letter-spacing:0.1em;margin-top:1px}
-.topbar-right{display:flex;align-items:center;gap:8px}
-.icon-btn{width:36px;height:36px;border-radius:50%;background:var(--mist);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--ink3);transition:all 0.2s}
-.icon-btn:hover{background:var(--mist2)}
-#update-label{font-size:10px;color:var(--ink3)}
-.page{display:none;animation:fadeUp 0.22s ease}.page.active{display:block}
-@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-.hero{margin:14px 20px;background:var(--ink);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;top:-50px;right:-30px;width:150px;height:150px;border-radius:50%;background:rgba(200,151,42,0.1)}
-.hero-lbl{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.1em;margin-bottom:5px}
-.hero-amt{font-family:'Noto Serif TC',serif;font-size:30px;font-weight:600;color:#fff;line-height:1}
-.hero-sub{font-size:12px;color:rgba(255,255,255,0.38);margin-top:5px}
-.hero-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,0.07);border-radius:8px;overflow:hidden;margin-top:14px}
-.hstat{background:rgba(255,255,255,0.04);padding:10px 8px;text-align:center}
-.hstat-lbl{font-size:10px;color:rgba(255,255,255,0.33);margin-bottom:3px}
-.hstat-val{font-size:13px;font-weight:500;color:#fff}
-.hstat-val.gold{color:#f5c842}.hstat-val.teal{color:#4dd9c8}.hstat-val.red{color:#ff8888}
-.alert-bar{margin:0 20px 12px;background:var(--gold-lt);border:1px solid rgba(200,151,42,0.28);border-radius:var(--radius-sm);padding:10px 14px;display:flex;gap:8px;align-items:flex-start}
-.alert-bar.hidden{display:none}
-.alert-pip{width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0;margin-top:5px}
-.alert-txt{font-size:12px;color:var(--gold-dk);line-height:1.5}
-.alert-txt strong{display:block;font-weight:700;margin-bottom:1px}
-.section{padding:0 20px;margin-bottom:22px}
-.sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-.sec-title{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:0.09em;text-transform:uppercase}
-.sec-btn{font-size:12px;color:var(--teal);padding:4px 12px;border:1px solid rgba(26,122,110,0.28);border-radius:20px;background:var(--teal-lt);cursor:pointer}
-.stock-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:15px;margin-bottom:10px;box-shadow:var(--shadow)}
-.sc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:13px}
-.sc-code{font-family:'DM Mono',monospace;font-size:18px;font-weight:500}
-.sc-name{font-size:12px;color:var(--ink3);margin-top:1px}
-.sc-badges{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
-.badge{font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px}
-.badge-etf{background:var(--teal-lt);color:var(--teal)}.badge-stock{background:var(--mist2);color:var(--ink3)}
-.badge-m{background:var(--green-lt);color:var(--green)}.badge-q{background:var(--teal-lt);color:var(--teal)}
-.badge-y{background:var(--gold-lt);color:var(--gold-dk)}.badge-irr{background:var(--mist2);color:var(--ink3)}
-.sc-right{text-align:right}
-.sc-price{font-size:17px;font-weight:500}
-.sc-chg{font-size:11px;margin-top:2px}.sc-chg.up{color:var(--red)}.sc-chg.dn{color:var(--green)}
-.sc-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:11px}
-.sm{background:var(--mist);border-radius:var(--radius-sm);padding:8px 10px}
-.sm-lbl{font-size:10px;color:var(--ink3);margin-bottom:2px}
-.sm-val{font-size:13px;font-weight:500}
-.sm-val.g{color:var(--green)}.sm-val.r{color:var(--red)}.sm-val.gold{color:var(--gold-dk)}
-.sc-footer{display:flex;align-items:center;justify-content:space-between;padding-top:9px;border-top:1px solid var(--border)}
-.sc-lots{font-size:12px;color:var(--ink3)}.sc-lots strong{color:var(--ink);font-size:14px}
-.sc-acts{display:flex;gap:5px}
-.sc-act{font-size:11px;padding:5px 9px;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--ink3);transition:all 0.15s;font-family:inherit}
-.sc-act:hover{background:var(--mist);color:var(--ink)}.sc-act.del:hover{color:var(--red);border-color:rgba(192,57,43,0.35)}
-.sc-ts{font-size:10px;color:var(--ink3);opacity:0.4;margin-top:5px}
-.tl-item{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border)}.tl-item:last-child{border-bottom:none}
-.tl-dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--teal);background:var(--white);flex-shrink:0;margin-top:3px}
-.tl-dot.hot{background:var(--gold);border-color:var(--gold)}.tl-dot.past{border-color:var(--mist3);background:var(--mist3)}
-.tl-body{flex:1}.tl-code{font-family:'DM Mono',monospace;font-size:13px;font-weight:500}
-.tl-date{font-size:11px;color:var(--ink3);margin-top:1px}.tl-r{text-align:right;flex-shrink:0}
-.tl-amt{font-size:14px;font-weight:500;color:var(--teal)}.tl-days{font-size:11px;color:var(--gold-dk);margin-top:1px}
-.search-wrap{padding:16px 20px 0}
-.page-title{font-family:'Noto Serif TC',serif;font-size:19px;font-weight:600;margin-bottom:14px}
-.tab-row{display:flex;gap:3px;background:var(--mist2);border-radius:var(--radius-sm);padding:3px;margin-bottom:12px}
-.tab-btn{flex:1;padding:7px;border:none;background:transparent;border-radius:6px;font-size:12px;font-family:inherit;color:var(--ink3);cursor:pointer;font-weight:500}
-.tab-btn.active{background:var(--white);color:var(--ink);box-shadow:0 1px 3px rgba(26,28,34,0.08)}
-.search-bar{display:flex;gap:8px;margin-bottom:12px}
-.search-bar input{flex:1;background:var(--white);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;color:var(--ink);font-size:14px;font-family:inherit;outline:none;transition:border-color 0.2s}
-.search-bar input:focus{border-color:var(--teal)}
-.search-bar input::placeholder{color:var(--ink3);opacity:0.5}
-.search-bar button{background:var(--ink);color:#fff;border:none;border-radius:var(--radius-sm);padding:11px 18px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;white-space:nowrap}
-.qtags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px}
-.qtag{font-size:11px;padding:4px 10px;background:var(--white);border:1px solid var(--border2);border-radius:20px;color:var(--ink3);cursor:pointer;font-family:'DM Mono',monospace}
-.qtag:hover{border-color:var(--teal);color:var(--teal);background:var(--teal-lt)}
-.res-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
-.res-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
-.res-code{font-family:'DM Mono',monospace;font-size:20px;font-weight:500}
-.res-name{font-size:12px;color:var(--ink3);margin-top:2px}
-.res-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:13px}
-.sim-box{background:var(--mist);border-radius:var(--radius-sm);padding:12px;margin-bottom:11px}
-.sim-title{font-size:11px;color:var(--ink3);margin-bottom:8px;font-weight:500}
-.sim-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}
-.sim-lbl{color:var(--ink3)}.sim-val{font-weight:500}.sim-val.g{color:var(--green)}.sim-val.r{color:var(--red)}
-.div-hist{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
-.div-hist-title{font-size:11px;color:var(--ink3);margin-bottom:6px;font-weight:500}
-.div-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)}.div-row:last-child{border-bottom:none}
-.tax-hero{margin:14px 20px;background:var(--ink2);border-radius:var(--radius);padding:18px 20px}
-.tax-lbl{font-size:10px;color:rgba(255,255,255,0.38);letter-spacing:0.08em;margin-bottom:4px}
-.tax-amt{font-family:'Noto Serif TC',serif;font-size:26px;font-weight:600;color:#fff}
-.tax-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 20px 18px}
-.tax-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:13px;box-shadow:var(--shadow)}
-.tax-card-lbl{font-size:11px;color:var(--ink3);margin-bottom:3px}.tax-card-val{font-size:17px;font-weight:600}
-.tax-card-val.r{color:var(--red)}.tax-card-val.g{color:var(--green)}.tax-card-val.gold{color:var(--gold-dk)}
-.tax-note-s{font-size:11px;color:var(--ink3);margin-top:2px}
-.tax-table{margin:0 20px 18px}
-.tt-lbl{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px}
-.tt-hd,.tt-row{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:3px;padding:9px 11px;border-radius:var(--radius-sm);margin-bottom:5px;font-size:12px}
-.tt-hd{background:var(--mist2);font-weight:500;font-size:11px;color:var(--ink3)}
-.tt-row{background:var(--white);border:1px solid var(--border)}
-.tt-cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tax-explain{margin:0 20px 20px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
-.tax-explain p{font-size:13px;line-height:1.8;color:var(--ink2);margin-bottom:8px}.tax-explain p:last-child{margin-bottom:0}
-.hist-item{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 13px;margin-bottom:8px}
-.hist-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
-.hist-code{font-family:'DM Mono',monospace;font-size:14px;font-weight:500}
-.hist-net{font-size:15px;font-weight:600;color:var(--green)}
-.hist-bot{display:flex;justify-content:space-between;font-size:11px;color:var(--ink3)}
-.bnav{position:fixed;bottom:0;left:0;right:0;background:rgba(250,249,246,0.96);backdrop-filter:blur(18px);border-top:1px solid var(--border);display:flex;max-width:480px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom,0px)}
-.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 12px;cursor:pointer;color:var(--ink3);font-size:10px;gap:3px;border:none;background:transparent;font-family:inherit}
-.bnav-btn.active{color:var(--teal)}
-.bnav-icon{font-size:17px;line-height:1}
-.overlay{display:none;position:fixed;inset:0;background:rgba(26,28,34,0.48);backdrop-filter:blur(4px);z-index:200;align-items:flex-end;justify-content:center}
-.overlay.open{display:flex}
-.modal{background:var(--paper);border-radius:20px 20px 0 0;border:1px solid var(--border);width:100%;max-width:480px;padding:20px 20px 44px;max-height:88vh;overflow-y:auto}
-.modal-handle{width:36px;height:4px;background:var(--mist3);border-radius:2px;margin:0 auto 18px}
-.modal-title{font-family:'Noto Serif TC',serif;font-size:18px;font-weight:600;margin-bottom:16px}
-.form-group{margin-bottom:13px}.form-lbl{font-size:12px;color:var(--ink3);margin-bottom:5px;display:block;font-weight:500}
-.form-inp{width:100%;background:var(--white);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;color:var(--ink);font-size:14px;font-family:inherit;outline:none;transition:border-color 0.2s}
-.form-inp:focus{border-color:var(--teal)}.form-inp::placeholder{color:var(--ink3);opacity:0.45}
-.form-select{width:100%;background:var(--white);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;color:var(--ink);font-size:14px;font-family:inherit;outline:none}
-.mbtn{width:100%;padding:13px;border-radius:var(--radius);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;border:none;margin-top:6px}
-.mbtn.primary{background:var(--ink);color:#fff}.mbtn.secondary{background:var(--mist2);color:var(--ink3)}
-.ai-loading{text-align:center;padding:22px;color:var(--ink3);font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px}
-.spinner{display:inline-block;width:15px;height:15px;border:2px solid var(--mist3);border-top-color:var(--teal);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0}
-.empty-state{text-align:center;padding:36px 20px;color:var(--ink3);font-size:13px}
-.empty-icon{font-size:30px;margin-bottom:10px;opacity:0.45}
-.avatar{width:50px;height:50px;border-radius:50%;background:var(--teal-lt);border:2px solid var(--teal);display:flex;align-items:center;justify-content:center;font-family:'Noto Serif TC',serif;font-size:19px;font-weight:600;color:var(--teal);margin:0 auto 14px}
-.src-badge{font-size:10px;color:var(--teal);background:var(--teal-lt);padding:2px 8px;border-radius:20px;margin-top:8px;display:inline-block}
-</style>
-</head>
-<body>
-<div class="app">
-<div id="toast"><div class="t-spinner" id="toast-spin"></div><span id="toast-msg"></span></div>
+// 台股存摺 Cloudflare Worker v10
+// 基於 v9，移除所得稅，新增去年殖利率
 
-<div class="topbar">
-  <div><div class="brand-zh">台股存摺</div><div class="brand-sub">股利 · 稅務 · 資產管理</div></div>
-  <div class="topbar-right">
-    <span id="update-label"></span>
-    <div class="icon-btn" onclick="manualRefresh()" title="立即更新">↻</div>
-    <div class="icon-btn" onclick="openModal('user-modal')">
-      <span id="avatar-label" style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--teal)">U</span>
-    </div>
-  </div>
-</div>
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Content-Type': 'application/json; charset=utf-8',
+};
 
-<!-- HOME -->
-<div class="page active" id="page-home">
-  <div class="hero">
-    <div class="hero-lbl">預估年度配息（稅前）</div>
-    <div class="hero-amt" id="h-annual">NT$ —</div>
-    <div class="hero-sub">扣除二代健保約 <span id="h-aftertax">—</span></div>
-    <div class="hero-grid">
-      <div class="hstat"><div class="hstat-lbl">持倉市值</div><div class="hstat-val" id="h-mktval">—</div></div>
-      <div class="hstat"><div class="hstat-lbl">平均殖利率</div><div class="hstat-val gold" id="h-yield">—</div></div>
-      <div class="hstat"><div class="hstat-lbl">二代健保費</div><div class="hstat-val red" id="h-nhi">—</div></div>
-    </div>
-  </div>
-  <div class="alert-bar hidden" id="alert-bar">
-    <div class="alert-pip"></div>
-    <div class="alert-txt"><strong id="alert-title"></strong><span id="alert-msg"></span></div>
-  </div>
-  <div class="section">
-    <div class="sec-hd"><span class="sec-title">我的持股</span><span class="sec-btn" onclick="openModal('add-modal')">＋ 新增</span></div>
-    <div id="holdings-list"><div class="empty-state"><div class="empty-icon">📒</div><div>存摺空白</div><div style="margin-top:5px;opacity:0.55">點擊「新增」加入股票或 ETF</div></div></div>
-  </div>
-  <div class="section">
-    <div class="sec-hd"><span class="sec-title">除權息日程</span></div>
-    <div id="upcoming-list"><div style="font-size:12px;color:var(--ink3);opacity:0.55;padding:6px 0">新增持股後自動顯示</div></div>
-  </div>
-</div>
+const memCache = new Map();
 
-<!-- SEARCH -->
-<div class="page" id="page-search">
-  <div class="search-wrap">
-    <div class="page-title">查詢股票 / ETF</div>
-    <div class="tab-row">
-      <button class="tab-btn active" onclick="setType(this)">全部</button>
-      <button class="tab-btn" onclick="setType(this)">ETF</button>
-      <button class="tab-btn" onclick="setType(this)">個股</button>
-    </div>
-    <div class="search-bar">
-      <input type="text" id="search-input" placeholder="輸入代號，例：2330、0056" />
-      <button onclick="doSearch()">查詢</button>
-    </div>
-    <div class="qtags">
-      <span class="qtag" onclick="qs('0056')">0056</span>
-      <span class="qtag" onclick="qs('00878')">00878</span>
-      <span class="qtag" onclick="qs('00919')">00919</span>
-      <span class="qtag" onclick="qs('2330')">2330</span>
-      <span class="qtag" onclick="qs('2454')">2454</span>
-      <span class="qtag" onclick="qs('006208')">006208</span>
-      <span class="qtag" onclick="qs('00929')">00929</span>
-      <span class="qtag" onclick="qs('2412')">2412</span>
-      <span class="qtag" onclick="qs('0050')">0050</span>
-      <span class="qtag" onclick="qs('2884')">2884</span>
-    </div>
-    <div id="search-result"></div>
-  </div>
-</div>
-
-<!-- TAX -->
-<div class="page" id="page-tax">
-  <div class="tax-hero"><div class="tax-lbl">本年度預估稅前配息</div><div class="tax-amt" id="tax-gross">NT$ —</div></div>
-  <div class="tax-grid">
-    <div class="tax-card"><div class="tax-card-lbl">預估年度配息</div><div class="tax-card-val" id="tax-gross" style="font-size:15px">—</div><div class="tax-note-s">稅前</div></div>
-    <div class="tax-card"><div class="tax-card-lbl">二代健保費</div><div class="tax-card-val gold" id="tax-nhi">—</div><div class="tax-note-s">2.11%（超 2 萬課）</div></div>
-    <div class="tax-card"><div class="tax-card-lbl">扣除健保後</div><div class="tax-card-val g" id="tax-net">—</div><div class="tax-note-s">實拿金額</div></div>
-    <div class="tax-card"><div class="tax-card-lbl">持倉市值</div><div class="tax-card-val" id="tax-mktval" style="font-size:15px">—</div><div class="tax-note-s">按現股價計算</div></div>
-  </div>
-  <div class="tax-table">
-    <div class="tt-lbl">各持股稅務明細</div>
-    <div class="tt-hd"><div class="tt-cell">代號</div><div class="tt-cell">年配息</div><div class="tt-cell">健保費</div><div class="tt-cell">扣健保後</div></div>
-    <div id="tax-rows"><div style="font-size:12px;color:var(--ink3);padding:10px 0;text-align:center">尚無持股</div></div>
-  </div>
-  <div class="tax-explain">
-    <p><strong>二代健保補充保費</strong>：單次配息超過 NT$20,000 者，依 2.11% 費率課徵，以<strong>全額現金配息</strong>為計算基礎，由公司代扣。</p>
-    <p><strong>股利所得占比</strong>：ETF 配息中屬於「股利所得」的比例（如 0056 為 27%），影響所得稅計算，但<strong>不影響二代健保</strong>。</p>
-    <p>所得稅（28% 分離課稅或合併計稅）因人而異，請自行評估。</p>
-  </div>
-</div>
-
-<!-- HISTORY -->
-<div class="page" id="page-history">
-  <div style="padding:16px 20px 0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div class="page-title" style="margin:0">配息紀錄</div>
-      <span class="sec-btn" onclick="exportHistCSV()">匯出 CSV</span>
-    </div>
-    <!-- 股票切換標籤 -->
-    <div id="hist-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <!-- 年度篩選 -->
-    <div style="display:flex;gap:5px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <span style="font-size:11px;color:var(--ink3);flex-shrink:0">年度：</span>
-      <div id="hist-years" style="display:flex;gap:5px;flex-wrap:wrap"></div>
-    </div>
-    <!-- 配息總覽卡 -->
-    <div id="hist-summary" style="display:none;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;box-shadow:var(--shadow)">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px">年度累計配息</div><div style="font-size:14px;font-weight:600;color:var(--teal)" id="hs-annual">—</div></div>
-        <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px">稅後實拿</div><div style="font-size:14px;font-weight:600;color:var(--green)" id="hs-net">—</div></div>
-        <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px">配息次數</div><div style="font-size:14px;font-weight:600" id="hs-count">—</div></div>
-      </div>
-    </div>
-    <!-- 明細列表 -->
-    <div id="hist-detail-list">
-      <div class="empty-state"><div class="empty-icon">📋</div><div>請先新增持股</div><div style="margin-top:5px;opacity:0.55">點選股票代號查看配息紀錄</div></div>
-    </div>
-  </div>
-</div>
-</div>
-
-<div class="bnav">
-  <button class="bnav-btn active" onclick="showPage('home',this)"><span class="bnav-icon">⬜</span><span>總覽</span></button>
-  <button class="bnav-btn" onclick="showPage('search',this)"><span class="bnav-icon">◎</span><span>查詢</span></button>
-  <button class="bnav-btn" onclick="showPage('tax',this)"><span class="bnav-icon">▣</span><span>稅務</span></button>
-  <button class="bnav-btn" onclick="showPage('history',this)"><span class="bnav-icon">≡</span><span>紀錄</span></button>
-</div>
-
-<!-- MODALS -->
-<div class="overlay" id="add-modal">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title">新增持股</div>
-    <div class="form-group"><label class="form-lbl">股票 / ETF 代號</label><input class="form-inp" id="add-code" placeholder="例：2330、0056、00878" /></div>
-    <div class="form-group"><label class="form-lbl">持股張數</label><input class="form-inp" id="add-lots" type="number" placeholder="例：10" min="0.001" step="0.001" /></div>
-    <div class="form-group"><label class="form-lbl">平均買入成本（元／股，選填）</label><input class="form-inp" id="add-cost" type="number" placeholder="例：42.50" step="0.01" /></div>
-    <div class="form-group"><label class="form-lbl">備註（選填）</label><input class="form-inp" id="add-note" placeholder="例：定期定額、長期存股" /></div>
-    <div id="add-preview"></div>
-
-    <!-- 手動輸入配息（查不到時展開）-->
-    <div id="add-manual-section" style="display:none;background:var(--gold-lt);border:1px solid rgba(200,151,42,0.3);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
-      <div style="font-size:12px;color:var(--gold-dk);font-weight:500;margin-bottom:10px">⚠️ 查無配息記錄，請手動輸入</div>
-      <div class="form-group" style="margin-bottom:8px"><label class="form-lbl">每股配息（元）</label><input class="form-inp" id="add-div-amount" type="number" step="0.0001" placeholder="例：0.0450" /></div>
-      <div class="form-group" style="margin-bottom:8px"><label class="form-lbl">除息日</label><input class="form-inp" id="add-div-exdate" type="date" /></div>
-      <div class="form-group" style="margin-bottom:8px"><label class="form-lbl">股利所得占比（%）</label>
-        <input class="form-inp" id="add-div-ratio" type="number" step="0.01" placeholder="例：100（一般為100%，部分ETF較低）" value="100" />
-        <div style="font-size:11px;color:var(--ink3);margin-top:4px">影響所得稅計算基礎（非二代健保）。二代健保以全額現金配息計算</div>
-      </div>
-      <div class="form-group" style="margin-bottom:0"><label class="form-lbl">配息頻率</label>
-        <select class="form-select" id="add-div-freq">
-          <option value="月配">月配</option>
-          <option value="季配">季配</option>
-          <option value="年配">年配</option>
-          <option value="不定期">不定期</option>
-        </select>
-      </div>
-    </div>
-
-    <button class="mbtn primary" id="add-submit-btn" onclick="handleAddSubmit()">查詢並加入持股</button>
-    <button class="mbtn secondary" onclick="closeModal('add-modal')">取消</button>
-  </div>
-</div>
-<div class="overlay" id="edit-modal">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title" id="edit-modal-title">編輯持股</div>
-    <div class="form-group"><label class="form-lbl">持股張數</label><input class="form-inp" id="edit-lots" type="number" step="0.001" /></div>
-    <div class="form-group"><label class="form-lbl">平均買入成本（元／股）</label><input class="form-inp" id="edit-cost" type="number" step="0.01" /></div>
-    <div class="form-group"><label class="form-lbl">備註</label><input class="form-inp" id="edit-note" placeholder="選填" /></div>
-    <div class="form-group"><label class="form-lbl">股利所得占比（%）</label>
-      <input class="form-inp" id="edit-ratio" type="number" step="0.01" placeholder="例：27（查投信公告）" />
-      <div style="font-size:11px;color:var(--ink3);margin-top:4px">影響所得稅基礎，不影響二代健保計算</div>
-    </div>
-    <input type="hidden" id="edit-code-val" />
-    <button class="mbtn primary" onclick="confirmEdit()">儲存</button>
-    <button class="mbtn secondary" onclick="closeModal('edit-modal')">取消</button>
-  </div>
-</div>
-
-<!-- 手動新增配息 Modal -->
-<div class="overlay" id="div-modal">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title">手動新增配息記錄</div>
-    <div style="font-size:12px;color:var(--ink3);background:var(--mist);padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;line-height:1.6">
-      適用於新上市 ETF 或 Yahoo 尚未更新的配息資料。資料儲存在本機，等 Yahoo 更新後可切換為自動抓取。
-    </div>
-    <div class="form-group"><label class="form-lbl">股票代號</label><input class="form-inp" id="div-code" readonly /></div>
-    <div class="form-group"><label class="form-lbl">除息日</label><input class="form-inp" id="div-exdate" type="date" /></div>
-    <div class="form-group"><label class="form-lbl">每股配息金額（元）</label><input class="form-inp" id="div-amount" type="number" step="0.0001" placeholder="例：0.0450" /></div>
-    <div class="form-group"><label class="form-lbl">配息日（選填）</label><input class="form-inp" id="div-paydate" type="date" /></div>
-    <input type="hidden" id="div-code-hidden" />
-    <button class="mbtn primary" onclick="confirmAddDiv()">新增</button>
-    <button class="mbtn secondary" onclick="closeModal('div-modal')">取消</button>
-  </div>
-</div>
-<!-- 手動輸入配息 Modal -->
-<div class="overlay" id="manual-div-modal">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title" id="manual-div-title">手動輸入配息</div>
-    <div style="font-size:12px;color:var(--ink3);background:var(--mist);padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;line-height:1.6">
-      適用於新上市 ETF 或 Yahoo 尚未更新的配息資料。<br>資料儲存在本機，之後 Yahoo 更新後可按「更新」自動切換。
-    </div>
-    <div class="form-group"><label class="form-lbl">除息日</label><input class="form-inp" id="mdiv-exdate" type="date" /></div>
-    <div class="form-group"><label class="form-lbl">每股配息（元）</label><input class="form-inp" id="mdiv-amount" type="number" step="0.0001" placeholder="例：0.0450" /></div>
-    <div class="form-group"><label class="form-lbl">配息日（選填）</label><input class="form-inp" id="mdiv-paydate" type="date" /></div>
-    <div class="form-group"><label class="form-lbl">配息頻率</label>
-      <select class="form-select" id="mdiv-freq">
-        <option value="月配">月配</option>
-        <option value="季配">季配</option>
-        <option value="年配">年配</option>
-        <option value="不定期">不定期</option>
-      </select>
-    </div>
-    <input type="hidden" id="mdiv-code" />
-    <button class="mbtn primary" onclick="confirmManualDiv()">新增配息記錄</button>
-    <button class="mbtn secondary" onclick="closeModal('manual-div-modal')">取消</button>
-  </div>
-</div>
-
-<div class="overlay" id="user-modal">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title">個人設定</div>
-    <div class="avatar" id="user-avatar-big">U</div>
-    <div class="form-group"><label class="form-lbl">姓名 / 暱稱</label><input class="form-inp" id="u-name" placeholder="例：阿明" /></div>
-
-    <div class="form-group"><label class="form-lbl">除息提前提醒天數</label><input class="form-inp" id="u-alert" type="number" value="7" min="1" max="60" /></div>
-    <button class="mbtn primary" onclick="saveUser()">儲存設定</button>
-    <button class="mbtn secondary" onclick="closeModal('user-modal')">取消</button>
-    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-      <div style="font-size:11px;color:var(--ink3);margin-bottom:8px">危險操作</div>
-      <button onclick="clearAllData()" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--red);background:transparent;color:var(--red);font-size:13px;cursor:pointer;font-family:inherit">清除所有持股資料（重新開始）</button>
-    </div>
-  </div>
-</div>
-
-<script>
-// ▼▼▼ 部署後把這裡換成你的 Cloudflare Worker 網址 ▼▼▼
-const WORKER = 'https://twstock2.jmcpv5b47b.workers.dev';
-// Worker 只負責股價（Yahoo Finance）
-// 除權息由瀏覽器直接抓 TWSE（台灣 IP，不被擋）
-
-const STORE='twstock_v5', NHI=0.0211, THR=20000;
-let S={user:{name:'',alertDays:7},holdings:[],history:[]};
-let busy=false;
-
-function load(){
-  try{const r=localStorage.getItem(STORE);if(r)S={...S,...JSON.parse(r)}}catch(e){}
-  syncUser();renderAll();autoRefresh();
-}
-function save(){try{localStorage.setItem(STORE,JSON.stringify(S))}catch(e){}}
-const fmt=n=>n?'NT$ '+Math.round(n).toLocaleString():'—';
-
-// ── 股價：透過 Worker 查 Yahoo Finance（自動試 .TW / .TWO）──
-async function fetchPrice(code){
-  try{
-    const r=await fetch(`${WORKER}/api/price?code=${encodeURIComponent(code)}`);
-    const j=await r.json();
-    if(j.ok && j.data?.price) return j.data;
-    return null;
-  }catch(e){return null}
+// 支援上市(.TW)和上櫃(.TWO)
+function yahooSyms(code) {
+  if (/[A-Z]/.test(code)) return [`${code}.TWO`, `${code}.TW`];
+  return [`${code}.TW`, `${code}.TWO`];
 }
 
-// ── 除權息：透過 Worker 查 Yahoo Finance（最穩定）──
-async function fetchDividends(code){
-  try{
-    const r=await fetch(`${WORKER}/api/exright?code=${encodeURIComponent(code)}`);
-    const j=await r.json();
-    if(j.ok) return j.data;
-  }catch(e){}
+export default {
+  async fetch(req) {
+    if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
+    const url  = new URL(req.url);
+    const code = (url.searchParams.get('code') || '').toUpperCase().trim();
+    const path = url.pathname;
+    try {
+      if (path === '/api/health')  return ok({ status:'ok', time:new Date().toISOString() });
+      if (path === '/api/price')   return await apiPrice(code);
+      if (path === '/api/exright') return await apiExRight(code);
+      if (path === '/api/stock')   return await apiStock(code);
+      if (path === '/api/debug')   return await apiDebug(code);
+      return err('找不到路由', 404);
+    } catch(e) {
+      return err('錯誤：' + e.message, 500);
+    }
+  }
+};
+
+// ══════════════════════════════════════
+// 取得配息歷史（自動試 .TW / .TWO）
+// ══════════════════════════════════════
+async function fetchDividends(code) {
+  const now  = Math.floor(Date.now()/1000);
+  const past = now - 365*3*24*3600; // 3 年
+
+  for (const sym of yahooSyms(code)) {
+    try {
+      const r    = await yFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&period1=${past}&period2=${now}&events=dividends`);
+      const json = await r.json();
+      const divEvents = json?.chart?.result?.[0]?.events?.dividends || {};
+      const records = Object.values(divEvents)
+        .map(ev => ({
+          exDate:   tsToDate(ev.date),
+          payDate:  '',
+          dividend: +(ev.amount || 0),
+          year:     new Date(ev.date*1000).getFullYear(),
+        }))
+        .sort((a,b) => b.exDate.localeCompare(a.exDate));
+      if (records.length > 0) return { records, sym };
+    } catch(e) {}
+  }
+  return { records: [], sym: '' };
+}
+
+// ══════════════════════════════════════
+// 計算頻率、今年/去年殖利率統計
+// ══════════════════════════════════════
+function calcStats(all, price) {
+  const cur  = new Date().getFullYear();
+  const prev = cur - 1; // 去年固定
+
+  const byYear = {};
+  all.forEach(r => {
+    if (!byYear[r.year]) byYear[r.year] = [];
+    byYear[r.year].push(r);
+  });
+
+  const thisData = byYear[cur]  || [];
+  const prevData = byYear[prev] || [];
+
+  // 用近12個月資料推算頻率（適合新ETF）
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 12);
+  const recent = all.filter(r => new Date(r.exDate) >= cutoff);
+  const freq = recent.length >= 10 ? '月配'
+             : recent.length >= 6  ? '月配'
+             : recent.length >= 3  ? '季配'
+             : recent.length >= 1  ? '年配' : '不定期';
+
+  // 今年累計配息
+  const thisSrc = thisData.length ? thisData : prevData;
+  const annDiv  = +thisSrc.reduce((s,r) => s+(r.dividend||0), 0).toFixed(4);
+
+  // 去年累計配息（固定用 cur-1）
+  const prevDiv   = +prevData.reduce((s,r) => s+(r.dividend||0), 0).toFixed(4);
+  const prevYield = (price && prevDiv) ? +(prevDiv/price*100).toFixed(2) : 0;
+
+  // 年化殖利率
+  const latest   = all[0] || {};
+  const mult     = freq==='月配'?12 : freq==='季配'?4 : 1;
+  const curYield = (price && latest.dividend) ? +(latest.dividend/price*100*mult).toFixed(2) : 0;
+  const annYield = (price && annDiv)           ? +(annDiv/price*100).toFixed(2) : 0;
+
+  return {
+    freq, annDiv, prevDiv,
+    thisYearCount: thisData.length,
+    annualYield:   annYield,
+    currentYield:  curYield,
+    prevYearYield: prevYield,
+    prevYear:      prev,  // 固定去年
+  };
+}
+
+// ══════════════════════════════════════
+// DEBUG
+// ══════════════════════════════════════
+async function apiDebug(code) {
+  if (!code) return err('請提供代號');
+  const { records, sym } = await fetchDividends(code);
+  const priceData = await fetchPrice(code);
+  const price = priceData?.price || 0;
+  const stats = calcStats(records, price);
+  return ok({ code, sym, records, price, stats });
+}
+
+// ══════════════════════════════════════
+// 1. 股價
+// ══════════════════════════════════════
+async function apiPrice(code) {
+  if (!code) return err('請提供代號');
+  const hit = getCache('price:'+code);
+  if (hit) return ok(hit);
+  const d = await fetchPrice(code);
+  if (!d) return err('查無股價');
+  setCache('price:'+code, d, 300);
+  return ok(d);
+}
+
+async function fetchPrice(code) {
+  for (const sym of yahooSyms(code)) {
+    try {
+      const r    = await yFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`);
+      const json = await r.json();
+      const meta = json?.chart?.result?.[0]?.meta;
+      if (!meta?.regularMarketPrice) continue;
+      const price  = meta.regularMarketPrice;
+      const prev   = meta.chartPreviousClose || meta.previousClose || price;
+      const change = prev ? +((price-prev)/prev*100).toFixed(2) : 0;
+      return {
+        code, sym,
+        name:   meta.longName || meta.shortName || code,
+        price,  change,
+        high:   meta.regularMarketDayHigh || price,
+        low:    meta.regularMarketDayLow  || price,
+        volume: meta.regularMarketVolume  || 0,
+        source: 'Yahoo Finance',
+      };
+    } catch(e) {}
+  }
   return null;
 }
 
-// 日期轉換：民國 → 西元
-function toAD(raw){
-  if(!raw) return '';
-  const s=String(raw).trim();
-  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m1=s.match(/^(\d{2,3})年(\d{1,2})月(\d{1,2})日$/);
-  if(m1) return `${+m1[1]+1911}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
-  const m2=s.match(/^(\d{2,3})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-  if(m2) return `${+m2[1]+1911}-${m2[2].padStart(2,'0')}-${m2[3].padStart(2,'0')}`;
-  return '';
-}
+// ══════════════════════════════════════
+// 2. 除權息
+// ══════════════════════════════════════
+async function apiExRight(code) {
+  if (!code) return err('請提供代號');
+  const hit = getCache('ex:'+code);
+  if (hit) return ok(hit);
 
-// 計算配息頻率與年度統計
-function calcDivStats(all){
-  const cur=new Date().getFullYear();
-  const prev=cur-1; // 去年固定是 cur-1
-  const byY={};
-  all.forEach(r=>{if(!byY[r.year])byY[r.year]=[];byY[r.year].push(r);});
-  const thisYr=byY[cur]||[];
-  const prevYr=byY[prev]||[];
+  const { records, sym } = await fetchDividends(code);
+  const priceData = await fetchPrice(code);
+  const price = priceData?.price || 0;
+  const stats = calcStats(records, price);
+  const latest = records[0] || {};
 
-  // 用所有資料推算頻率（12個月內的記錄數）
-  const recentMonths=12;
-  const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-recentMonths);
-  const recent=all.filter(r=>new Date(r.exDate)>=cutoff);
-  const freq=recent.length>=10?'月配':recent.length>=6?'月配':recent.length>=3?'季配':recent.length>=1?'年配':'不定期';
-
-  // 當年配息：用今年資料，不足則用去年
-  const src=thisYr.length?thisYr:prevYr;
-  const annDiv=+src.reduce((s,r)=>s+(r.dividend||0),0).toFixed(4);
-
-  // 去年配息與殖利率（固定用 cur-1）
-  const prevAnnDiv=+prevYr.reduce((s,r)=>s+(r.dividend||0),0).toFixed(4);
-
-  return{freq,annDiv,prevAnnDiv,thisYearCount:thisYr.length,prevYear:prev};
-}
-
-// 預估下次除息
-function estimateNext(last,freq){
-  if(!last) return '';
-  const days={月配:30,季配:91,年配:365,不定期:365};
-  const d=new Date(last);
-  if(isNaN(d.getTime())) return '';
-  d.setDate(d.getDate()+(days[freq]||365));
-  if(d<new Date()) d.setDate(d.getDate()+(days[freq]||365));
-  return d.toISOString().slice(0,10);
-}
-
-// 整合查詢：股價（Worker）+ 除權息（瀏覽器直接抓）
-async function fetchStock(code){
-  showToast('查詢 '+code+'...',false);
-  try{
-    // 同時查股價和配息（各自有獨立的錯誤處理）
-    const [priceData, ex] = await Promise.all([
-      fetchPrice(code).catch(()=>null),
-      fetchDividends(code).catch(()=>null),
-    ]);
-
-    // 查詢完成，關閉 toast
-    showToast(code+' 查詢完成', true, 1500);
-
-    const price = priceData?.price||0;
-    return {
-      code,
-      name: priceData?.name||code,
-      type: /[A-Z]/.test(code)?'ETF(上櫃)':/^(0[0-9]{3,5}|006[0-9]{3})$/.test(code)?'ETF':'股票',
-      freq: ex?.freq||'不定期',
-      price,
-      change: priceData?.change||0,
-      high: priceData?.high||0,
-      low: priceData?.low||0,
-      volume: priceData?.volume||0,
-      dividend: ex?.latestDividend||0,
-      annualDividend: ex?.annualDividend||0,
-      annualYield: ex?.annualYield||0,
-      currentYield: ex?.currentYield||0,
-      prevYearYield: ex?.prevYearYield||0,
-      prevYear: ex?.prevYear||new Date().getFullYear()-1,
-      exDate: ex?.latestExDate||'',
-      payDate: ex?.latestPayDate||'',
-      nextExDate: ex?.nextExDate||'',
-      dividendHistory: ex?.records||[],
-      thisYearCount: ex?.thisYearCount||0,
-      needsManualInput: !ex || ex?.needsManualInput||false,
-      updatedAt: new Date().toISOString(),
-      source: ex?.source||'Yahoo Finance',
-    };
-  } catch(e) {
-    showToast(code+' 查詢失敗', true, 3000);
-    return { code, name:code, needsManualInput:true, price:0 };
-  }
-}
-
-async function autoRefresh(){
-  if(!S.holdings.length)return;
-  const hrs=(Date.now()-(S.lastRefreshTs||0))/3600000;
-  if(hrs<1&&S.lastRefreshTs){showToast('資料已是最新（'+timeSince(S.lastRefreshTs)+'前更新）',true,2500);return;}
-  await refreshAll();
-}
-async function manualRefresh(){if(!busy)await refreshAll();}
-
-async function refreshAll(){
-  if(!S.holdings.length){showToast('尚無持股',true,2000);return;}
-  busy=true;
-  const changes=[];
-  for(let i=0;i<S.holdings.length;i++){
-    const h=S.holdings[i];
-    showToast(`更新 ${h.code}… (${i+1}/${S.holdings.length})`,false);
-    const d=await fetchStock(h.code);
-    if(!d)continue;
-    const c=diff(h,d);if(c.length)changes.push({code:h.code,c});
-    const{lots,cost,note}=h;
-    S.holdings[i]={code:h.code,lots,cost,note,...d,updatedAt:new Date().toISOString()};
-  }
-  S.lastRefreshTs=Date.now();save();renderAll();busy=false;
-  showToast(changes.length?'更新完成 — '+changes.map(x=>`${x.code}: ${x.c.join('、')}`).join('；'):'更新完成，資料無變動',true,changes.length?6000:2500);
-  updateLabel();
-}
-
-function diff(o,n){
-  const out=[];
-  if(o.price&&n.price&&Math.abs(+n.price-+o.price)>=0.01)out.push(`股價${+n.price>+o.price?'▲':'▼'}NT$${Math.abs(+n.price-+o.price).toFixed(2)}`);
-  if(o.dividend&&n.dividend&&Math.abs(+n.dividend-+o.dividend)>=0.0001)out.push(`配息${+n.dividend>+o.dividend?'▲':'▼'}NT$${Math.abs(+n.dividend-+o.dividend).toFixed(4)}`);
-  if(n.exDate&&o.exDate&&n.exDate!==o.exDate)out.push(`除息日→${n.exDate}`);
-  return out;
-}
-
-let _toastTimer=null;
-function showToast(msg,done,ms){
-  const t=document.getElementById('toast');
-  if(_toastTimer){clearTimeout(_toastTimer);_toastTimer=null;}
-  t.classList.remove('fade');t.classList.add('show');
-  document.getElementById('toast-spin').style.display=done?'none':'block';
-  document.getElementById('toast-msg').textContent=msg;
-  if(done){
-    const delay=ms||3000;
-    _toastTimer=setTimeout(()=>{t.classList.add('fade');setTimeout(()=>t.classList.remove('show','fade'),450)},delay);
-  }
-}
-function timeSince(ts){const m=Math.floor((Date.now()-ts)/60000);return m<1?'剛才':m<60?m+'分鐘':Math.floor(m/60)+'小時'}
-function updateLabel(){const e=document.getElementById('update-label');if(S.lastRefreshTs)e.textContent=timeSince(S.lastRefreshTs)+'前'}
-
-function syncUser(){
-  const u=S.user,ini=u.name?u.name[0].toUpperCase():'U';
-  document.getElementById('avatar-label').textContent=ini;
-  document.getElementById('user-avatar-big').textContent=ini;
-  document.getElementById('u-name').value=u.name||'';
-  document.getElementById('u-alert').value=u.alertDays||7;
-}
-function saveUser(){
-  S.user.name=document.getElementById('u-name').value.trim();
-  S.user.alertDays=parseInt(document.getElementById('u-alert').value)||7;
-  save();syncUser();closeModal('user-modal');renderAll();
-}
-
-function showPage(n,el){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+n).classList.add('active');el.classList.add('active');
-  if(n==='history')renderHistory();if(n==='tax')renderTax();
-}
-function openModal(id){document.getElementById(id).classList.add('open')}
-function closeModal(id){document.getElementById(id).classList.remove('open')}
-function setType(el){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active')}
-function qs(c){document.getElementById('search-input').value=c;doSearch()}
-
-async function doSearch(){
-  const code=document.getElementById('search-input').value.trim().toUpperCase();
-  if(!code)return;
-  const el=document.getElementById('search-result');
-  el.innerHTML=`<div class="ai-loading"><span class="spinner"></span>查詢 ${code}（TWSE + Yahoo）...</div>`;
-  const d=await fetchStock(code);
-  if(!d){el.innerHTML='<div style="color:var(--red);font-size:13px;padding:12px 0;text-align:center">查無資料，請確認代號是否正確</div>';return;}
-  const div10=10000*(+d.dividend||0);
-  const nhi10=div10>THR?div10*NHI:0,net10=div10-nhi10;
-  const chg=parseFloat(d.change||0);
-  const already=S.holdings.find(x=>x.code===code);
-  const fb=d.freq==='月配'?'badge-m':d.freq==='季配'?'badge-q':d.freq==='年配'?'badge-y':'badge-irr';
-  const histHTML=(d.dividendHistory||[]).slice(0,5).map(r=>`<div class="div-row"><span style="color:var(--ink3)">${r.exDate||'—'}</span><span>NT$ ${(+r.dividend).toFixed(4)}</span><span style="color:var(--ink3)">${r.payDate||'—'}</span></div>`).join('');
-
-  el.innerHTML=`<div class="res-card">
-    <div class="res-hd">
-      <div><div class="res-code">${d.code}</div><div class="res-name">${d.name||''}</div>
-        <div style="display:flex;gap:4px;margin-top:6px">
-          <span class="badge ${d.type==='ETF'?'badge-etf':'badge-stock'}">${d.type||'股票'}</span>
-          <span class="badge ${fb}">${d.freq||'不定期'}</span>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:17px;font-weight:500">NT$ ${(+d.price).toFixed(2)}</div>
-        ${chg!==0?`<div class="sc-chg ${chg>=0?'up':'dn'}" style="text-align:right">${chg>=0?'▲':'▼'}${(+Math.abs(chg)||0).toFixed(2)}%</div>`:''}
-      </div>
-    </div>
-    <div class="res-metrics">
-      <div class="sm"><div class="sm-lbl">最新每股配息</div><div class="sm-val">NT$ ${(+d.dividend).toFixed(4)}</div></div>
-      <div class="sm"><div class="sm-lbl">當年累計配息</div><div class="sm-val">NT$ ${(+d.annualDividend).toFixed(4)}</div></div>
-      <div class="sm"><div class="sm-lbl">當年累計殖利率</div><div class="sm-val g">${(+d.annualYield).toFixed(2)}%</div></div>
-      <div class="sm"><div class="sm-lbl">年化殖利率</div><div class="sm-val g">${(+d.currentYield).toFixed(2)}%</div></div>
-      <div class="sm"><div class="sm-lbl">除息日</div><div class="sm-val gold">${d.exDate||'—'}</div></div>
-      <div class="sm"><div class="sm-lbl">預估下次除息</div><div class="sm-val gold">${d.nextExDate||'—'}</div></div>
-      ${d.peRatio?`<div class="sm"><div class="sm-lbl">本益比</div><div class="sm-val">${d.peRatio}</div></div>`:''}
-    </div>
-    <div class="sim-box">
-      <div class="sim-title">試算：持有 10 張（二代健保試算）</div>
-      <div class="sim-row"><span class="sim-lbl">稅前配息</span><span class="sim-val">NT$ ${Math.round(div10).toLocaleString()}</span></div>
-      <div class="sim-row"><span class="sim-lbl">二代健保費</span><span class="sim-val r">${nhi10>0?'NT$ '+Math.round(nhi10).toLocaleString():'免課'}</span></div>
-      <div class="sim-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px">
-        <span class="sim-lbl" style="font-weight:600">扣健保後實拿</span>
-        <span class="sim-val g" style="font-size:15px;font-weight:700">NT$ ${Math.round(net10).toLocaleString()}</span>
-      </div>
-    </div>
-    ${histHTML?`<div class="div-hist"><div class="div-hist-title">近期配息記錄（TWSE 官方）</div>${histHTML}</div>`:''}
-    <span class="src-badge">資料來源：${d.source||'TWSE'}</span>
-    ${already
-      ?'<div style="font-size:12px;color:var(--gold-dk);margin-top:12px;padding:8px;background:var(--gold-lt);border-radius:var(--radius-sm)">已在持股中</div>'
-      :`<button class="mbtn primary" style="margin-top:12px" onclick="addFromSearch('${code}')">加入持股</button>`}
-  </div>`;
-}
-
-function addFromSearch(code){
-  document.getElementById('add-code').value=code;
-  showPage('home',document.querySelectorAll('.bnav-btn')[0]);
-  openModal('add-modal');
-}
-
-function handleAddSubmit(){
-  // 如果手動輸入區塊是展開的，代表是「填完配息後加入」
-  const manualSection = document.getElementById('add-manual-section');
-  if(manualSection.style.display !== 'none'){
-    const amount  = parseFloat(document.getElementById('add-div-amount').value)||0;
-    const exDate  = document.getElementById('add-div-exdate').value;
-    const freq    = document.getElementById('add-div-freq').value;
-    const ratio   = parseFloat(document.getElementById('add-div-ratio').value)||100;
-    if(!amount||!exDate){ alert('請填寫每股配息金額和除息日'); return; }
-    const code = document.getElementById('add-code').value.trim().toUpperCase();
-    const lots = parseFloat(document.getElementById('add-lots').value)||0;
-    const cost = parseFloat(document.getElementById('add-cost').value)||0;
-    const note = document.getElementById('add-note').value.trim();
-    // 確保 _pendingStock 有資料
-    const baseData = window._pendingStock || { name:code, price:0, type:'ETF(上櫃)', needsManualInput:false };
-    doAddHolding(code, lots, cost, note, baseData, {amount, exDate, freq, ratio});
-    return;
-  }
-  confirmAdd();
-}
-
-async function confirmAdd(){
-  const code=document.getElementById('add-code').value.trim().toUpperCase();
-  const lots=parseFloat(document.getElementById('add-lots').value)||0;
-  const cost=parseFloat(document.getElementById('add-cost').value)||0;
-  const note=document.getElementById('add-note').value.trim();
-  if(!code||!lots){alert('請填寫代號與張數');return;}
-  if(S.holdings.find(x=>x.code===code)){alert(code+' 已在持股中');return;}
-
-  document.getElementById('add-preview').innerHTML='<div class="ai-loading"><span class="spinner"></span>查詢 '+code+' 資料中...</div>';
-
-  const d = await fetchStock(code);
-
-  // fetchStock 失敗 或 查無配息 → 顯示手動輸入
-  if(!d || d?.needsManualInput){
-    const price = d?.price||0;
-    document.getElementById('add-preview').innerHTML=
-      '<div style="font-size:12px;color:var(--teal);padding:6px 0">'
-      +(price>0?'✓ 股價已取得：NT$ '+price+'，請填寫下方配息資料後再加入':'查無股價，請填寫下方配息資料後再加入')
-      +'</div>';
-    document.getElementById('add-manual-section').style.display='block';
-    document.getElementById('add-submit-btn').textContent='填完配息後加入';
-    window._pendingStock = d || { name:code, price:0, type:'ETF(上櫃)', needsManualInput:false };
-    return;
-  }
-
-  // 有完整資料，直接加入
-  doAddHolding(code, lots, cost, note, d, null);
-}
-
-function doAddHolding(code, lots, cost, note, d, manualDiv){
-  // d 可能為 null，統一用空物件
-  d = d || { name:code, price:0, type:'ETF(上櫃)', needsManualInput:false };
-  // 整合手動配息
-  let dividend    = d.dividend||0;
-  let freq        = d.freq||'不定期';
-  let exDate      = d.exDate||'';
-  let nextExDate  = d.nextExDate||'';
-  let divHistory  = d.dividendHistory||[];
-  let needsManual = d.needsManualInput||false;
-
-  if(manualDiv){
-    dividend   = manualDiv.amount;
-    freq       = manualDiv.freq;
-    exDate     = manualDiv.exDate;
-    nextExDate = estimateNextLocal(manualDiv.exDate, manualDiv.freq);
-    const yr   = parseInt(manualDiv.exDate?.slice(0,4))||new Date().getFullYear();
-    divHistory = [{ exDate:manualDiv.exDate, payDate:'', dividend:manualDiv.amount, year:yr, manual:true }];
-    needsManual = false;
-    const price = d?.price||0;
-    const mult  = freq==='月配'?12:freq==='季配'?4:1;
-    d = d||{};
-    d.currentYield   = price ? +(dividend/price*100*mult).toFixed(2) : 0;
-    d.annualDividend = dividend;
-    d.annualYield    = price ? +(dividend/price*100).toFixed(2) : 0;
-    d.incomeRatio    = manualDiv.ratio||100;
-  }
-
-  const holding = {
-    code, lots, cost, note,
-    name:d?.name||code, type:d?.type||'ETF(上櫃)', freq,
-    price:d?.price||0, change:d?.change||0,
-    dividend,
-    annualDividend:d?.annualDividend||0,
-    annualYield:d?.annualYield||0,
-    currentYield:d?.currentYield||0,
-    prevYearYield:d?.prevYearYield||0,
-    prevYear:d?.prevYear||0,
-    incomeRatio:d?.incomeRatio||100,
-    exDate, payDate:'', nextExDate,
-    dividendHistory: divHistory,
-    manualDividends: manualDiv ? [{ exDate:manualDiv.exDate, payDate:'', dividend:manualDiv.amount, year:parseInt(manualDiv.exDate?.slice(0,4))||new Date().getFullYear(), manual:true }] : [],
-    needsManualInput: needsManual,
-    updatedAt:new Date().toISOString()
+  const d = {
+    code, sym, freq: stats.freq,
+    records:          records.slice(0, 24),
+    annualDividend:   stats.annDiv,
+    prevYearDividend: stats.prevDiv,
+    latestDividend:   latest.dividend || 0,
+    latestExDate:     latest.exDate   || '',
+    latestPayDate:    '',
+    nextExDate:       estimateNext(latest.exDate, stats.freq),
+    thisYearCount:    stats.thisYearCount,
+    annualYield:      stats.annualYield,
+    currentYield:     stats.currentYield,
+    prevYearYield:    stats.prevYearYield,
+    prevYear:         stats.prevYear,
+    // 是否需要手動輸入（Yahoo 查不到記錄）
+    needsManualInput: records.length === 0,
+    source: records.length
+      ? `Yahoo Finance (${sym})，共 ${records.length} 筆`
+      : `查無配息記錄（請手動輸入）`,
   };
 
-  S.holdings.push(holding);
-  save(); renderAll();
+  if (records.length > 0) setCache('ex:'+code, d, 3600);
+  return ok(d);
+}
 
-  // 清空
-  document.getElementById('add-preview').innerHTML='';
-  document.getElementById('add-manual-section').style.display='none';
-  document.getElementById('add-submit-btn').textContent='查詢並加入持股';
-  ['add-code','add-lots','add-cost','add-note','add-div-amount','add-div-exdate'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.value='';
+// ══════════════════════════════════════
+// 3. 整合查詢
+// ══════════════════════════════════════
+async function apiStock(code) {
+  if (!code) return err('請提供代號');
+
+  const [priceData, exRes] = await Promise.all([
+    fetchPrice(code),
+    apiExRight(code),
+  ]);
+
+  const ex = (await exRes.json()).data;
+  if (!priceData) return err('查無此代號：' + code);
+
+  const price = priceData.price || 0;
+  const div   = ex?.latestDividend || 0;
+
+  return ok({
+    code,
+    name:     priceData.name || code,
+    type:     isETF(code) ? 'ETF' : '股票',
+    freq:     ex?.freq || '不定期',
+    price,
+    change:   priceData.change  || 0,
+    high:     priceData.high    || 0,
+    low:      priceData.low     || 0,
+    volume:   priceData.volume  || 0,
+
+    // 配息資料
+    dividend:           div,
+    annualDividend:     ex?.annualDividend     || 0,
+    prevYearDividend:   ex?.prevYearDividend   || 0,
+
+    // 殖利率（三種）
+    currentYield:   ex?.currentYield   || 0,  // 年化（最新配息×頻率÷股價）
+    annualYield:    ex?.annualYield    || 0,  // 今年累計÷股價
+    prevYearYield:  ex?.prevYearYield  || 0,  // 去年累計÷股價
+    prevYear:       ex?.prevYear       || 0,
+
+    exDate:     ex?.latestExDate  || '',
+    payDate:    ex?.latestPayDate || '',
+    nextExDate: ex?.nextExDate    || '',
+
+    dividendHistory:  ex?.records        || [],
+    thisYearCount:    ex?.thisYearCount  || 0,
+
+    // 是否需要手動輸入
+    needsManualInput: ex?.needsManualInput || false,
+
+    incomeRatio: 100,
+    updatedAt:   new Date().toISOString(),
+    source:      ex?.source || 'Yahoo Finance',
   });
-  window._pendingStock = null;
-  closeModal('add-modal');
-
-  showToast(code + (needsManual?'（待手動輸入配息）':' 已加入持股'), true, 2500);
 }
 
-function openEditModal(code){
-  const h=S.holdings.find(x=>x.code===code);if(!h)return;
-  document.getElementById('edit-code-val').value=code;
-  document.getElementById('edit-modal-title').textContent='編輯 '+code+' '+h.name;
-  document.getElementById('edit-lots').value=h.lots;
-  document.getElementById('edit-cost').value=h.cost||'';
-  document.getElementById('edit-note').value=h.note||'';
-  document.getElementById('edit-ratio').value=h.incomeRatio||100;
-  openModal('edit-modal');
-}
-function confirmEdit(){
-  const code=document.getElementById('edit-code-val').value;
-  const idx=S.holdings.findIndex(x=>x.code===code);if(idx<0)return;
-  S.holdings[idx].lots=parseFloat(document.getElementById('edit-lots').value)||S.holdings[idx].lots;
-  S.holdings[idx].cost=parseFloat(document.getElementById('edit-cost').value)||0;
-  S.holdings[idx].note=document.getElementById('edit-note').value;
-  S.holdings[idx].incomeRatio=parseFloat(document.getElementById('edit-ratio').value)||100;
-  save();renderAll();closeModal('edit-modal');
-}
-function deleteHolding(code){
-  if(!confirm('確定刪除 '+code+'？'))return;
-  S.holdings=S.holdings.filter(x=>x.code!==code);save();renderAll();
-}
-async function refreshOne(code){
-  const idx=S.holdings.findIndex(x=>x.code===code);if(idx<0)return;
-  showToast('更新 '+code+'...',false);
-  const old=S.holdings[idx],d=await fetchStock(code);
-  if(d){
-    const c=diff(old,d);const{lots,cost,note,manualDividends}=old;
-    // 保留手動輸入的配息記錄
-    const merged = [...(manualDividends||[]), ...(d.dividendHistory||[]).filter(r=>!r.manual)];
-    merged.sort((a,b)=>b.exDate.localeCompare(a.exDate));
-    S.holdings[idx]={code,lots,cost,note,...d,
-      manualDividends:manualDividends||[],
-      dividendHistory:merged,
-      needsManualInput: d.needsManualInput && !(manualDividends?.length),
-      updatedAt:new Date().toISOString()};
-    S.lastRefreshTs=Date.now();save();renderAll();
-    showToast(c.length?`${code}: ${c.join('、')}`:`${code} 已更新，無變動`,true,3000);
-  }else showToast(code+' 更新失敗，請檢查網路',true,2500);
-  updateLabel();
-}
-
-function fBadge(f){const c=f==='月配'?'badge-m':f==='季配'?'badge-q':f==='年配'?'badge-y':'badge-irr';return`<span class="badge ${c}">${f||'不定期'}</span>`}
-
-function renderHoldings(){
-  const el=document.getElementById('holdings-list');
-  if(!S.holdings.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📒</div><div>存摺空白</div><div style="margin-top:5px;opacity:0.55">點擊「新增」加入股票或 ETF</div></div>';return;}
-  
-  el.innerHTML=S.holdings.map(h=>{
-    // 全部確保為數字，避免 null.toFixed 錯誤
-    const price  = +(h.price||0);
-    const div    = +(h.lots||0)*1000*(+(h.dividend||0));
-    const nhi    = div>THR ? div*NHI : 0;
-    const net    = div-nhi;
-    const mv     = +(h.lots||0)*1000*price;
-    const cost   = +(h.cost||0);
-    const cb     = cost ? +(h.lots||0)*1000*cost : 0;
-    const pnl    = (cb>0&&price>0) ? mv-cb : null;
-    const pnlPct = (cb>0&&price>0&&cost>0) ? ((price-cost)/cost*100) : null;
-    const chg    = +(h.change||0);
-    const ts=h.updatedAt?new Date(h.updatedAt).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
-    return`<div class="stock-card">
-      <div class="sc-top">
-        <div>
-          <div class="sc-code">${h.code}</div><div class="sc-name">${h.name||h.code}</div>
-          <div class="sc-badges"><span class="badge ${h.type==='ETF'?'badge-etf':'badge-stock'}">${h.type||'股票'}</span>${fBadge(h.freq)}</div>
-        </div>
-        <div class="sc-right">
-          <div class="sc-price">NT$ ${price>0?price.toFixed(2):'—'}</div>
-          ${chg!==0?`<div class="sc-chg ${chg>=0?'up':'dn'}">${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(2)}%</div>`:''}
-        </div>
-      </div>
-      <div class="sc-metrics">
-        <div class="sm"><div class="sm-lbl">每股配息</div><div class="sm-val">NT$ ${h.dividend?(+h.dividend).toFixed(4):'—'}</div></div>
-        <div class="sm"><div class="sm-lbl">股利所得占比</div><div class="sm-val">${h.incomeRatio||100}%<span style="font-size:10px;color:var(--ink3)"> → 所得 ${(+(h.dividend||0)*(+(h.incomeRatio||100))/100).toFixed(4)}元/股</span></div></div>
-        <div class="sm"><div class="sm-lbl">扣健保後實拿</div><div class="sm-val g">${div?fmt(net):'—'}</div></div>
-        <div class="sm"><div class="sm-lbl">今年累計殖利率</div><div class="sm-val g">${h.annualYield?(+(+h.annualYield||0)).toFixed(2)+'%':'—'}</div></div>
-        <div class="sm"><div class="sm-lbl">去年(${h.prevYear||'—'})殖利率</div><div class="sm-val teal">${h.prevYearYield?(+(+h.prevYearYield||0)).toFixed(2)+'%':'—'}</div></div>
-        <div class="sm"><div class="sm-lbl">二代健保費</div><div class="sm-val r">${nhi>0?fmt(nhi):'免課'}</div></div>
-        <div class="sm"><div class="sm-lbl">除息日</div><div class="sm-val gold">${h.exDate||'—'}</div></div>
-        <div class="sm"><div class="sm-lbl">下次除息（預估）</div><div class="sm-val gold">${h.nextExDate||'—'}</div></div>
-        ${(pnl!==null&&pnlPct!==null)?`<div class="sm"><div class="sm-lbl">損益</div><div class="sm-val ${pnl>=0?'r':'g'}">${fmt(pnl)} <span style="font-size:10px">(${(+pnlPct).toFixed(2)}%)</span></div></div>`:''}
-        <div class="sm"><div class="sm-lbl">持倉市值</div><div class="sm-val">${fmt(mv)}</div></div>
-      </div>
-      ${h.needsManualInput?`<div style="background:var(--gold-lt);border:1px solid rgba(200,151,42,0.3);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;color:var(--gold-dk)">⚠️ Yahoo 尚無配息資料</span>
-        <button onclick="openManualDivModal('${h.code}')" style="font-size:11px;padding:4px 10px;border-radius:var(--radius-sm);border:1px solid var(--gold);background:transparent;color:var(--gold-dk);cursor:pointer">手動輸入</button>
-      </div>`:''}
-      <div class="sc-footer">
-        <div class="sc-lots">持有 <strong>${h.lots}</strong> 張${h.cost?' ｜ 成本 NT$'+cost.toFixed(2):''}</div>
-        <div class="sc-acts">
-          <button class="sc-act" onclick="refreshOne('${h.code}')">更新</button>
-          <button class="sc-act" onclick="openEditModal('${h.code}')">編輯</button>
-          <button class="sc-act" onclick="openManualDivModal('${h.code}')">＋配息</button>
-          <button class="sc-act del" onclick="deleteHolding('${h.code}')">刪除</button>
-        </div>
-      </div>
-      ${h.note?`<div style="font-size:11px;color:var(--ink3);margin-top:5px;padding:4px 8px;background:var(--mist);border-radius:4px">${h.note}</div>`:''}
-      <div class="sc-ts">TWSE 官方資料 · 更新：${ts}</div>
-    </div>`;
-  }).join('');
-}
-
-function renderSummary(){
-  let gross=0,mv=0,nhi=0,ys=0,yc=0;
-  S.holdings.forEach(h=>{
-    const ann=h.lots*1000*(+h.annualDividend||+h.dividend||0);
-    const n=ann>THR?ann*NHI:0;
-    gross+=ann;mv+=h.lots*1000*(+h.price||0);nhi+=n;
-    if(h.annualYield){ys+=(+h.annualYield);yc++;}
+// ══════════════════════════════════════
+// 工具
+// ══════════════════════════════════════
+function yFetch(url) {
+  return fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0',
+      'Accept':     'application/json',
+      'Referer':    'https://finance.yahoo.com/',
+    }
   });
-  document.getElementById('h-annual').textContent=fmt(gross);
-  document.getElementById('h-aftertax').textContent=fmt(gross-nhi);
-  document.getElementById('h-mktval').textContent=mv?'NT$ '+Math.round(mv/10000).toLocaleString()+'萬':'—';
-  document.getElementById('h-yield').textContent=yc?(ys/yc).toFixed(2)+'%':'—';
-  document.getElementById('h-nhi').textContent=nhi?fmt(nhi):'—';
-  updateLabel();
 }
 
-function renderUpcoming(){
-  const el=document.getElementById('upcoming-list'),today=new Date();
-  const items=S.holdings.filter(h=>h.exDate||h.nextExDate).map(h=>{
-    const ds=h.nextExDate||h.exDate;return{...h,ds,diff:Math.ceil((new Date(ds)-today)/86400000)};
-  }).sort((a,b)=>a.diff-b.diff).slice(0,6);
-  if(!items.length){el.innerHTML='<div style="font-size:12px;color:var(--ink3);opacity:0.55;padding:6px 0">新增持股後自動顯示</div>';return;}
-  el.innerHTML=items.map(h=>{
-    const past=h.diff<0,hot=h.diff>=0&&h.diff<=7;
-    const ds=past?`${Math.abs(h.diff)}天前`:h.diff===0?'今天':h.diff<=60?`${h.diff}天後`:'';
-    return`<div class="tl-item">
-      <div class="tl-dot ${past?'past':hot?'hot':''}"></div>
-      <div class="tl-body"><div class="tl-code">${h.code} <span style="font-size:11px;font-weight:400;color:var(--ink3)">${h.name||''}</span></div><div class="tl-date">除息 ${h.ds}${h.payDate?' ／ 配息 '+h.payDate:''}</div></div>
-      <div class="tl-r"><div class="tl-amt">NT$ ${(+h.dividend).toFixed(4)}</div>${ds?`<div class="tl-days">${ds}</div>`:''}</div>
-    </div>`;
-  }).join('');
+function tsToDate(ts) {
+  const d = new Date((ts + 8*3600) * 1000);
+  return d.toISOString().slice(0, 10);
 }
 
-function renderAlerts(){
-  const days=S.user.alertDays||7,today=new Date();
-  const soon=S.holdings.filter(h=>{const ds=h.nextExDate||h.exDate;if(!ds)return false;return Math.ceil((new Date(ds)-today)/86400000)<=days&&Math.ceil((new Date(ds)-today)/86400000)>=0;});
-  const bar=document.getElementById('alert-bar');
-  if(!soon.length){bar.classList.add('hidden');return;}
-  bar.classList.remove('hidden');
-  document.getElementById('alert-title').textContent=`${soon.length} 檔即將除息（${days} 天內）`;
-  document.getElementById('alert-msg').textContent=soon.map(h=>{const d=Math.ceil((new Date(h.nextExDate||h.exDate)-today)/86400000);return`${h.code}（${d===0?'今天':d+'天後'}，NT$${(+h.dividend).toFixed(4)}/股）`;}).join('、');
-}
+function isETF(c) { return /^(0[0-9]{3,5}|006[0-9]{3})$/.test(c); }
 
-function renderTax(){
-  let gross=0,nhi=0,mv=0;
-  S.holdings.forEach(h=>{
-    const ann=h.lots*1000*(+h.annualDividend||+h.dividend||0);
-    const n=ann>THR?ann*NHI:0;
-    gross+=ann;nhi+=n;
-    mv+=h.lots*1000*(+h.price||0);
-  });
-  document.getElementById('tax-gross').textContent=fmt(gross);
-  document.getElementById('tax-nhi').textContent=fmt(nhi);
-  document.getElementById('tax-net').textContent=fmt(gross-nhi);
-  document.getElementById('tax-mktval').textContent=mv?'NT$ '+Math.round(mv/10000).toLocaleString()+'萬':'—';
-  document.getElementById('tax-rows').innerHTML=S.holdings.length
-    ?S.holdings.map(h=>{
-        const ann=h.lots*1000*(+h.annualDividend||+h.dividend||0);
-        const n=ann>THR?ann*NHI:0;
-        return`<div class="tt-row">
-          <div class="tt-cell" style="font-family:'DM Mono',monospace">${h.code}</div>
-          <div class="tt-cell">${ann?'NT$'+Math.round(ann).toLocaleString():'—'}</div>
-          <div class="tt-cell" style="color:var(--gold-dk)">${n>0?'NT$'+Math.round(n).toLocaleString():'免'}</div>
-          <div class="tt-cell" style="color:var(--green);font-weight:500">${fmt(ann-n)}</div>
-        </div>`;}).join('')
-    :'<div style="font-size:12px;color:var(--ink3);padding:10px 0;text-align:center">尚無持股</div>';
-}
-
-// ── 配息紀錄頁 ──
-let histActiveCode = '';
-let histActiveYear = 'all';
-
-function renderHistory(){
-  if(!S.holdings.length){
-    document.getElementById('hist-tabs').innerHTML='';
-    document.getElementById('hist-years').innerHTML='';
-    document.getElementById('hist-summary').style.display='none';
-    document.getElementById('hist-detail-list').innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div>請先新增持股</div></div>';
-    return;
-  }
-
-  // 建立股票切換標籤
-  const tabsEl = document.getElementById('hist-tabs');
-  const codes  = S.holdings.map(h=>h.code);
-  if(!histActiveCode || !codes.includes(histActiveCode)) histActiveCode = codes[0];
-
-  tabsEl.innerHTML = codes.map(code=>{
-    const h = S.holdings.find(x=>x.code===code);
-    const active = code===histActiveCode;
-    return `<span onclick="switchHistTab('${code}')" style="font-size:12px;padding:5px 12px;border-radius:20px;cursor:pointer;font-family:'DM Mono',monospace;border:1px solid ${active?'var(--teal)':' var(--border2)'};background:${active?'var(--teal-lt)':' var(--white)'};color:${active?'var(--teal)':' var(--ink3)'};transition:all 0.15s">${code}</span>`;
-  }).join('');
-
-  renderHistDetail();
-}
-
-function switchHistTab(code){
-  histActiveCode = code;
-  histActiveYear = 'all';
-  renderHistory();
-}
-
-function renderHistDetail(){
-  const h = S.holdings.find(x=>x.code===histActiveCode);
-  if(!h) return;
-
-  const records = h.dividendHistory || [];
-
-  // 建立年度篩選
-  const years = [...new Set(records.map(r=>r.exDate?.slice(0,4)).filter(Boolean))].sort((a,b)=>b-a);
-  const yearsEl = document.getElementById('hist-years');
-  yearsEl.innerHTML = ['all',...years].map(y=>{
-    const active = y===histActiveYear;
-    const label  = y==='all'?'全部':y+'年';
-    return `<span onclick="switchHistYear('${y}')" style="font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;border:1px solid ${active?'var(--teal)':' var(--border2)'};background:${active?'var(--teal-lt)':' var(--white)'};color:${active?'var(--teal)':' var(--ink3)'}">${label}</span>`;
-  }).join('');
-
-  // 過濾年度
-  const filtered = histActiveYear==='all'
-    ? records
-    : records.filter(r=>r.exDate?.startsWith(histActiveYear));
-
-  // 計算總覽
-  const annDiv = +filtered.reduce((s,r)=>s+(r.dividend||0),0).toFixed(4);
-  const totalDiv = h.lots * 1000 * annDiv;
-  const nhi = totalDiv > THR ? totalDiv*NHI : 0;
-  const net = totalDiv - nhi;
-
-  const sumEl = document.getElementById('hist-summary');
-  if(filtered.length){
-    sumEl.style.display='block';
-    document.getElementById('hs-annual').textContent = 'NT$ ' + annDiv.toFixed(4) + ' /股';
-    document.getElementById('hs-net').textContent    = fmt(net);
-    document.getElementById('hs-count').textContent  = filtered.length + ' 次';
-  } else {
-    sumEl.style.display='none';
-  }
-
-  // 明細列表
-  const detailEl = document.getElementById('hist-detail-list');
-  if(!filtered.length){
-    detailEl.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div>此年度無配息記錄</div></div>';
-    return;
-  }
-
-  detailEl.innerHTML = filtered.map(r=>{
-    const rowDiv  = h.lots * 1000 * (r.dividend||0);
-    const rowNhi  = rowDiv > THR ? rowDiv*NHI : 0;
-    const rowNet  = rowDiv - rowNhi;
-    const chgPrev = ''; // 可擴充比較上次
-    return `<div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 2px rgba(26,28,34,0.04)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div>
-          <div style="font-size:13px;font-weight:500;color:var(--ink)">${r.exDate||'—'} 除息</div>
-          ${r.payDate?`<div style="font-size:11px;color:var(--ink3)">配息日 ${r.payDate}</div>`:''} 
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:16px;font-weight:600;color:var(--teal)">NT$ ${(r.dividend||0).toFixed(4)}/股</div>
-          <div style="font-size:11px;color:var(--ink3)">${h.lots} 張 × 1000 股</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding-top:8px;border-top:1px solid var(--border)">
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--ink3)">稅前配息</div>
-          <div style="font-size:13px;font-weight:500">NT$ ${Math.round(rowDiv).toLocaleString()}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--ink3)">二代健保</div>
-          <div style="font-size:13px;font-weight:500;color:var(--red)">${rowNhi>0?'-NT$ '+Math.round(rowNhi).toLocaleString():'免課'}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--ink3)">稅後實拿</div>
-          <div style="font-size:13px;font-weight:600;color:var(--green)">NT$ ${Math.round(rowNet).toLocaleString()}</div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function switchHistYear(y){
-  histActiveYear = y;
-  renderHistDetail();
-}
-
-function exportHistCSV(){
-  const h = S.holdings.find(x=>x.code===histActiveCode);
-  if(!h || !h.dividendHistory?.length){ alert('無資料可匯出'); return; }
-  const hd  = '除息日,代號,名稱,張數,每股配息,稅前配息,二代健保,扣健保後實拿';
-  const rows = (h.dividendHistory||[]).map(r=>{
-    const total = h.lots*1000*(r.dividend||0);
-    const nhi   = total>THR?(total*NHI).toFixed(0):0;
-    return[r.exDate||'—',h.code,h.name||h.code,h.lots,(r.dividend||0).toFixed(4),total.toFixed(0),nhi,(total-nhi).toFixed(0)].join(',');
-  });
-  const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent([hd,...rows].join('\n'));
-  a.download=h.code+'_配息紀錄.csv';
-  a.click();
-}
-
-function exportCSV(){ exportHistCSV(); }
-
-// ── 手動輸入配息 ──
-function openManualDivModal(code) {
-  const h = S.holdings.find(x=>x.code===code);
-  if (!h) return;
-  document.getElementById('mdiv-code').value = code;
-  document.getElementById('manual-div-title').textContent = '手動輸入配息 — ' + code + ' ' + (h.name||'');
-  document.getElementById('mdiv-exdate').value = '';
-  document.getElementById('mdiv-amount').value = '';
-  document.getElementById('mdiv-paydate').value = '';
-  document.getElementById('mdiv-freq').value = h.freq||'月配';
-  openModal('manual-div-modal');
-}
-
-function confirmManualDiv() {
-  const code    = document.getElementById('mdiv-code').value;
-  const exDate  = document.getElementById('mdiv-exdate').value;
-  const amount  = parseFloat(document.getElementById('mdiv-amount').value)||0;
-  const payDate = document.getElementById('mdiv-paydate').value;
-  const freq    = document.getElementById('mdiv-freq').value;
-
-  if (!exDate || !amount) { alert('請填寫除息日和配息金額'); return; }
-
-  const idx = S.holdings.findIndex(x=>x.code===code);
-  if (idx<0) return;
-
-  const h = S.holdings[idx];
-  const year = parseInt(exDate.slice(0,4));
-
-  // 加入手動配息記錄
-  if (!h.manualDividends) h.manualDividends = [];
-  // 避免重複
-  const exists = h.manualDividends.find(d=>d.exDate===exDate);
-  if (!exists) {
-    h.manualDividends.unshift({ exDate, payDate, dividend: amount, year, manual: true });
-    h.manualDividends.sort((a,b)=>b.exDate.localeCompare(a.exDate));
-  }
-
-  // 更新持股主資料
-  h.freq = freq;
-  h.dividend = amount;
-  h.dividendHistory = [...h.manualDividends, ...(h.dividendHistory||[]).filter(d=>!d.manual)];
-  h.latestExDate = h.dividendHistory[0]?.exDate || exDate;
-  h.nextExDate = estimateNextLocal(exDate, freq);
-  h.needsManualInput = false;
-
-  // 重新計算殖利率
-  const price = h.price||0;
-  const mult = freq==='月配'?12:freq==='季配'?4:1;
-  h.currentYield = price ? +(amount/price*100*mult).toFixed(2) : 0;
-
-  // 當年累計
-  const curYear = new Date().getFullYear();
-  const thisYrDivs = h.dividendHistory.filter(d=>d.year===curYear);
-  const annDiv = +thisYrDivs.reduce((s,d)=>s+(d.dividend||0),0).toFixed(4);
-  h.annualDividend = annDiv;
-  h.annualYield = price ? +(annDiv/price*100).toFixed(2) : 0;
-
-  save(); renderAll();
-  closeModal('manual-div-modal');
-  showToast(code + ' 配息已新增：NT$' + amount + '/股', true, 3000);
-}
-
-function estimateNextLocal(last, freq) {
+function estimateNext(last, freq) {
   if (!last) return '';
-  const days = {月配:30,季配:91,年配:365,不定期:365};
+  const days = { 月配:30, 季配:91, 年配:365, 不定期:365 };
   const d = new Date(last);
   if (isNaN(d.getTime())) return '';
-  // 往後加一個週期
-  d.setDate(d.getDate()+(days[freq]||365));
-  // 如果估算日還在過去，繼續往後加
+  const step = days[freq] || 365;
+  d.setDate(d.getDate() + step);
   const today = new Date();
-  while(d < today) d.setDate(d.getDate()+(days[freq]||365));
-  return d.toISOString().slice(0,10);
+  while (d < today) d.setDate(d.getDate() + step);
+  return d.toISOString().slice(0, 10);
 }
 
-function clearAllData(){
-  if(!confirm('確定要清除所有持股資料嗎？此操作無法復原！')) return;
-  localStorage.removeItem(STORE);
-  S={user:{name:'',alertDays:7},holdings:[],history:[]};
-  save(); syncUser(); renderAll();
-  closeModal('user-modal');
-  showToast('所有資料已清除',true,2500);
+function getCache(k) {
+  const i = memCache.get(k);
+  if (!i || Date.now() > i.exp) { memCache.delete(k); return null; }
+  return i.data;
 }
-
-function renderAll(){renderHoldings();renderSummary();renderUpcoming();renderAlerts();}
-load();
-</script>
-</body>
-</html>
+function setCache(k,v,t) { memCache.set(k, { data:v, exp:Date.now()+t*1000 }); }
+function ok(d)    { return new Response(JSON.stringify({ok:true,  data:d, ts:Date.now()}), {headers:CORS}); }
+function err(m,s=400) { return new Response(JSON.stringify({ok:false, error:m, ts:Date.now()}), {status:s, headers:CORS}); }
